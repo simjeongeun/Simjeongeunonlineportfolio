@@ -1,21 +1,24 @@
 import { ProjectDetailTemplate } from './ProjectDetailTemplate';
 import { motion } from 'motion/react';
 import { useEffect } from 'react';
-import heroImage from 'figma:asset/677c6c05e6550f174340d3b63248ecdd9b67f940.png';
-import maskImage from 'figma:asset/d2f5eb5ce2b4d46e0e0156da3fb8db78a41e141b.png';
-import targetImage from 'figma:asset/971c33335c8bd17148202c98eed94f5d8ea356c0.png';
-import conceptUnitImage from 'figma:asset/5ba0afdca73222cd38140ac42047e37ed9e8c719.png';
-import conceptModuleRailImage from 'figma:asset/d6584351caee038241b6746393e25c68fe8fb193.png';
-import unit1Image from 'figma:asset/1fb076b3ba0e093fc10f9a5cc4106e215530e0be.png';
-import unit2Image from 'figma:asset/0f2d21e8f5840d514515fbee5c51bc15ecc1f557.png';
-import unit3Image from 'figma:asset/96a6e39c8359049fce98de60cb1011e0ae163732.png';
-import floor5Image from 'figma:asset/7b70614ca25cc8506eae5144a6b226ab8b2d6db7.png';
-import floor6Image from 'figma:asset/f2954d3f24a7860b41a7323789ce127be98b5bcf.png';
-import floor7Image from 'figma:asset/e3d784822a6b3a4c39d413a61d8ae8cb1049e9cf.png';
-import unitCombinesImage from 'figma:asset/675d531798bb6f795c02f3bbe0ec6a3fe8caf73b.png';
-import render1Image from 'figma:asset/cd9cb3ef138493fa59d2b0ee334943cf393ea76b.png';
-import render2Image from 'figma:asset/41ac74c505a856d13ffe5206a80ac3ef38ec11b2.png';
-import render3Image from 'figma:asset/4811628f19ca8067860a271afec08db9b2eef99e.png';
+import { cldImage } from '@/app/lib/cloudinary';
+
+const PROJECT_FOLDER = 'portfolio/dynamic-modular';
+const heroImage = cldImage(`${PROJECT_FOLDER}/hero`);
+const maskImage = cldImage(`${PROJECT_FOLDER}/mask`);
+const targetImage = cldImage(`${PROJECT_FOLDER}/target`);
+const conceptUnitImage = cldImage(`${PROJECT_FOLDER}/concept-unit`);
+const conceptModuleRailImage = cldImage(`${PROJECT_FOLDER}/concept-module-rail`);
+const unit1Image = cldImage(`${PROJECT_FOLDER}/unit-1`);
+const unit2Image = cldImage(`${PROJECT_FOLDER}/unit-2`);
+const unit3Image = cldImage(`${PROJECT_FOLDER}/unit-3`);
+const floor5Image = cldImage(`${PROJECT_FOLDER}/floor-5`);
+const floor6Image = cldImage(`${PROJECT_FOLDER}/floor-6`);
+const floor7Image = cldImage(`${PROJECT_FOLDER}/floor-7`);
+const unitCombinesImage = cldImage(`${PROJECT_FOLDER}/unit-combines`);
+const render1Image = cldImage(`${PROJECT_FOLDER}/render-1`);
+const render2Image = cldImage(`${PROJECT_FOLDER}/render-2`);
+const render3Image = cldImage(`${PROJECT_FOLDER}/render-3`);
 
 export function DynamicModularProject() {
   useEffect(() => {
