@@ -125,58 +125,71 @@ export function EditableImage({
   const matchingPreset = ASPECT_PRESETS.find((p) => (p.value ?? '') === (aspectOverride ?? ''));
   const isCustom = !!aspectOverride && !matchingPreset;
 
-  // The image (or placeholder) gets the caller's className + any aspect
-  // override via inline style. That way the *image itself* fills the slot
-  // at the chosen ratio using object-fit: cover — the surrounding layout
-  // tracks the image's edges exactly, not the other way around.
-  const baseStyle: CSSProperties = {
+  // Use the classic "aspect-ratio'd wrapper + absolutely positioned image"
+  // pattern. The wrapper owns the box; the image is forced to fill it via
+  // position:absolute + width/height 100% + object-fit:cover. This is
+  // rock-solid across browsers and guarantees the aspect override wins.
+  const wrapperStyle: CSSProperties = {
     ...style,
-    display: 'block',
+    position: 'relative',
+    overflow: 'hidden',
     ...(aspectOverride ? { aspectRatio: aspectOverride } : {}),
+  };
+
+  const fillStyle: CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
   };
 
   if (!isAdmin) {
     if (!hasImage) return null;
-    return <img src={current} alt={alt} className={className} style={baseStyle} />;
+    return (
+      <div className={className} style={wrapperStyle}>
+        <img src={current} alt={alt} style={fillStyle} />
+      </div>
+    );
   }
 
-  const adminFrameStyle: CSSProperties = {
-    ...baseStyle,
+  const adminWrapperStyle: CSSProperties = {
+    ...wrapperStyle,
     outline: '1px dashed rgba(0, 87, 255, 0.4)',
     outlineOffset: '2px',
   };
 
   return (
     <div className="w-full">
-      {hasImage ? (
-        <img
-          ref={imgRef}
-          src={current}
-          alt={alt}
-          onLoad={handleImgLoad}
-          className={className}
-          style={adminFrameStyle}
-        />
-      ) : (
-        <div
-          className={className}
-          style={{
-            ...adminFrameStyle,
-            background:
-              'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#999999',
-            fontFamily: 'Inter, Pretendard, sans-serif',
-            fontSize: 13,
-            letterSpacing: '0.05em',
-            minHeight: 120,
-          }}
-        >
-          이미지 없음 — 아래 "업로드" 버튼을 누르세요
-        </div>
-      )}
+      <div className={className} style={adminWrapperStyle}>
+        {hasImage ? (
+          <img
+            ref={imgRef}
+            src={current}
+            alt={alt}
+            onLoad={handleImgLoad}
+            style={fillStyle}
+          />
+        ) : (
+          <div
+            style={{
+              ...fillStyle,
+              background:
+                'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#999999',
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontSize: 13,
+              letterSpacing: '0.05em',
+            }}
+          >
+            이미지 없음 — 아래 "업로드" 버튼을 누르세요
+          </div>
+        )}
+      </div>
 
       <div
         className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-md bg-[#F9FBFF] border border-[#E5ECF5]"
