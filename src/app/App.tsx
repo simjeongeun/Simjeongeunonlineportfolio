@@ -3,13 +3,16 @@ import { router } from './routes';
 import { AuthProvider } from './lib/auth';
 import { ContentProvider } from './lib/content';
 import { ProjectsProvider } from './lib/projects';
+import { NavProvider } from './lib/nav';
 
 export default function App() {
   return (
     <AuthProvider>
       <ContentProvider>
         <ProjectsProvider>
-          <RouterProvider router={router} />
+          <NavProvider>
+            <RouterProvider router={router} />
+          </NavProvider>
         </ProjectsProvider>
       </ContentProvider>
     </AuthProvider>
