@@ -28,6 +28,9 @@ const MANUAL_KEY = 'manual';
 const DEFAULT_POSITION = '50% 50%';
 const MIN_HEIGHT = 120;
 const MAX_HEIGHT = 2400;
+const MIN_WIDTH_PCT = 25;
+const MAX_WIDTH_PCT = 100;
+type ResizeAxis = 'height' | 'width' | 'both';
 
 function normalizeAspect(input: string): string | null {
   const trimmed = input.trim();
@@ -71,6 +74,7 @@ export function EditableImage({
   const current = get(contentKey, defaultSrc);
   const storedAspect = get(`${contentKey}.aspect`, '');
   const storedHeight = get(`${contentKey}.height`, '');
+  const storedWidthPct = get(`${contentKey}.widthPct`, '');
   const storedPosition = get(`${contentKey}.position`, DEFAULT_POSITION);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -81,11 +85,13 @@ export function EditableImage({
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   const [livePosition, setLivePosition] = useState<string | null>(null);
   const [liveHeight, setLiveHeight] = useState<number | null>(null);
+  const [liveWidthPct, setLiveWidthPct] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [resizing, setResizing] = useState(false);
+  const [resizing, setResizing] = useState<ResizeAxis | null>(null);
 
   const isManual = storedAspect === MANUAL_KEY;
   const manualHeight = isManual ? parseInt(storedHeight, 10) || undefined : undefined;
+  const manualWidthPct = isManual ? parseFloat(storedWidthPct) || undefined : undefined;
 
   useEffect(() => {
     setDims(null);
@@ -99,6 +105,10 @@ export function EditableImage({
   useEffect(() => {
     setLiveHeight(null);
   }, [storedHeight]);
+
+  useEffect(() => {
+    setLiveWidthPct(null);
+  }, [storedWidthPct]);
 
   // Position drag (object-position)
   useEffect(() => {
@@ -144,25 +154,45 @@ export function EditableImage({
     };
   }, [dragging, storedPosition, contentKey, set]);
 
-  // Height resize (manual mode)
+  // Manual-mode resize (height, width, or both depending on which handle was grabbed)
   useEffect(() => {
     if (!resizing) return;
     const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-    const startTop = wrapper.getBoundingClientRect().top;
-    let latest = manualHeight ?? wrapper.offsetHeight;
+    const parent = wrapper?.parentElement;
+    if (!wrapper || !parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const startLeft = wrapperRect.left;
+    const startTop = wrapperRect.top;
+
+    let latestHeight = manualHeight ?? wrapper.offsetHeight;
+    let latestWidthPct = manualWidthPct ?? (wrapper.offsetWidth / parent.offsetWidth) * 100;
 
     const onMove = (e: PointerEvent) => {
-      const target = e.clientY - startTop;
-      latest = Math.round(clamp(target, MIN_HEIGHT, MAX_HEIGHT));
-      setLiveHeight(latest);
+      if (resizing === 'height' || resizing === 'both') {
+        const targetH = e.clientY - startTop;
+        latestHeight = Math.round(clamp(targetH, MIN_HEIGHT, MAX_HEIGHT));
+        setLiveHeight(latestHeight);
+      }
+      if (resizing === 'width' || resizing === 'both') {
+        const targetW = e.clientX - startLeft;
+        const pct = (targetW / parentRect.width) * 100;
+        latestWidthPct = clamp(pct, MIN_WIDTH_PCT, MAX_WIDTH_PCT);
+        setLiveWidthPct(Math.round(latestWidthPct * 10) / 10);
+      }
     };
     const onUp = async () => {
-      setResizing(false);
+      const axis = resizing;
+      setResizing(null);
       try {
-        await set(`${contentKey}.height`, `${latest}`);
+        if (axis === 'height' || axis === 'both') {
+          await set(`${contentKey}.height`, `${latestHeight}`);
+        }
+        if (axis === 'width' || axis === 'both') {
+          await set(`${contentKey}.widthPct`, `${latestWidthPct.toFixed(1)}`);
+        }
       } catch (err) {
-        console.error('[EditableImage] height save failed', err);
+        console.error('[EditableImage] resize save failed', err);
       }
     };
     window.addEventListener('pointermove', onMove);
@@ -171,7 +201,7 @@ export function EditableImage({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [resizing, manualHeight, contentKey, set]);
+  }, [resizing, manualHeight, manualWidthPct, contentKey, set]);
 
   const handleImgLoad = () => {
     const img = imgRef.current;
@@ -185,11 +215,11 @@ export function EditableImage({
     setDragging(true);
   };
 
-  const handleResizeDown = (e: React.PointerEvent) => {
+  const startResize = (axis: ResizeAxis) => (e: React.PointerEvent) => {
     if (!isAdmin) return;
     e.preventDefault();
     e.stopPropagation();
-    setResizing(true);
+    setResizing(axis);
   };
 
   const pickFile = () => fileRef.current?.click();
@@ -217,6 +247,7 @@ export function EditableImage({
       await set(contentKey, '');
       await set(`${contentKey}.aspect`, '');
       await set(`${contentKey}.height`, '');
+      await set(`${contentKey}.widthPct`, '');
       await set(`${contentKey}.position`, '');
     } catch (err) {
       alert('이미지 제거 실패: ' + (err instanceof Error ? err.message : String(err)));
@@ -226,9 +257,10 @@ export function EditableImage({
   const pickAspect = async (value: string | undefined) => {
     try {
       await set(`${contentKey}.aspect`, value ?? '');
-      // leaving manual mode clears the manual height
+      // leaving manual mode clears manual height / width
       if (value !== MANUAL_KEY) {
         await set(`${contentKey}.height`, '');
+        await set(`${contentKey}.widthPct`, '');
       }
       setCustomInput('');
       setCustomError(null);
@@ -238,13 +270,14 @@ export function EditableImage({
   };
 
   const pickManual = async () => {
-    // Snapshot the current rendered height so "manual" starts where Auto/preset
-    // left off instead of collapsing to MIN_HEIGHT.
     const wrapper = wrapperRef.current;
-    const snap = wrapper ? Math.round(clamp(wrapper.offsetHeight, MIN_HEIGHT, MAX_HEIGHT)) : 400;
+    const parent = wrapper?.parentElement;
+    const snapH = wrapper ? Math.round(clamp(wrapper.offsetHeight, MIN_HEIGHT, MAX_HEIGHT)) : 400;
+    const snapW = wrapper && parent ? (wrapper.offsetWidth / parent.offsetWidth) * 100 : 100;
     try {
       await set(`${contentKey}.aspect`, MANUAL_KEY);
-      await set(`${contentKey}.height`, `${snap}`);
+      await set(`${contentKey}.height`, `${snapH}`);
+      await set(`${contentKey}.widthPct`, `${clamp(snapW, MIN_WIDTH_PCT, MAX_WIDTH_PCT).toFixed(1)}`);
       setCustomInput('');
       setCustomError(null);
     } catch (err) {
@@ -262,6 +295,7 @@ export function EditableImage({
     try {
       await set(`${contentKey}.aspect`, normalized);
       await set(`${contentKey}.height`, '');
+      await set(`${contentKey}.widthPct`, '');
     } catch (err) {
       alert('비율 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -283,13 +317,22 @@ export function EditableImage({
   const effectivePosition = livePosition ?? storedPosition;
   const isRepositioned = storedPosition !== DEFAULT_POSITION && storedPosition !== '';
   const effectiveHeight = liveHeight ?? manualHeight;
+  const effectiveWidthPct = liveWidthPct ?? manualWidthPct;
 
   const wrapperStyle: CSSProperties = {
     ...style,
     position: 'relative',
     overflow: 'hidden',
+    // Defaults explicitly reset anything a previous render could have set.
+    aspectRatio: undefined,
+    height: undefined,
+    width: undefined,
     ...(isManual
-      ? { height: `${effectiveHeight ?? 400}px`, aspectRatio: 'auto' }
+      ? {
+          height: `${effectiveHeight ?? 400}px`,
+          width: `${effectiveWidthPct ?? 100}%`,
+          aspectRatio: 'auto',
+        }
       : aspectOverride
       ? { aspectRatio: aspectOverride }
       : {}),
@@ -374,43 +417,93 @@ export function EditableImage({
           </div>
         )}
         {isManual && (
-          <div
-            onPointerDown={handleResizeDown}
-            className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
-            style={{
-              height: 10,
-              cursor: 'ns-resize',
-              background: resizing ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
-              transition: 'background 120ms',
-              touchAction: 'none',
-              zIndex: 10,
-            }}
-            title="아래로 드래그해서 높이 조절"
-          >
-            <span
+          <>
+            {/* Bottom edge — vertical resize */}
+            <div
+              onPointerDown={startResize('height')}
+              className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
               style={{
-                display: 'inline-block',
-                width: 32,
-                height: 3,
-                borderRadius: 2,
-                background: resizing ? '#0057FF' : 'rgba(0,87,255,0.6)',
+                height: 10,
+                cursor: 'ns-resize',
+                background:
+                  resizing === 'height' ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
+                transition: 'background 120ms',
+                touchAction: 'none',
+                zIndex: 10,
               }}
+              title="세로 크기 조절"
+            >
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 32,
+                  height: 3,
+                  borderRadius: 2,
+                  background:
+                    resizing === 'height' ? '#0057FF' : 'rgba(0,87,255,0.6)',
+                }}
+              />
+            </div>
+
+            {/* Right edge — horizontal resize */}
+            <div
+              onPointerDown={startResize('width')}
+              className="absolute top-0 bottom-0 right-0 flex items-center justify-center"
+              style={{
+                width: 10,
+                cursor: 'ew-resize',
+                background:
+                  resizing === 'width' ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
+                transition: 'background 120ms',
+                touchAction: 'none',
+                zIndex: 10,
+              }}
+              title="가로 크기 조절"
+            >
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 3,
+                  height: 32,
+                  borderRadius: 2,
+                  background:
+                    resizing === 'width' ? '#0057FF' : 'rgba(0,87,255,0.6)',
+                }}
+              />
+            </div>
+
+            {/* Bottom-right corner — both axes */}
+            <div
+              onPointerDown={startResize('both')}
+              className="absolute bottom-0 right-0"
+              style={{
+                width: 18,
+                height: 18,
+                cursor: 'nwse-resize',
+                background:
+                  resizing === 'both' ? '#0057FF' : 'rgba(0,87,255,0.85)',
+                transition: 'background 120ms',
+                touchAction: 'none',
+                zIndex: 11,
+                clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+              }}
+              title="모서리 드래그: 가로·세로 동시 조절"
             />
-          </div>
-        )}
-        {isManual && (
-          <div
-            className="absolute top-2 right-2 px-2 py-1 rounded-full pointer-events-none"
-            style={{
-              background: 'rgba(0,87,255,0.9)',
-              color: 'white',
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontSize: 11,
-              fontWeight: 500,
-            }}
-          >
-            {effectiveHeight ?? 400} px
-          </div>
+
+            {/* Size badge */}
+            <div
+              className="absolute top-2 right-2 px-2 py-1 rounded-full pointer-events-none"
+              style={{
+                background: 'rgba(0,87,255,0.9)',
+                color: 'white',
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontSize: 11,
+                fontWeight: 500,
+              }}
+            >
+              {(effectiveWidthPct ?? 100).toFixed(0)}% × {effectiveHeight ?? 400}px
+            </div>
+          </>
         )}
       </div>
 
