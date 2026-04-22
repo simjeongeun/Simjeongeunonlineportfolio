@@ -4,64 +4,106 @@ This is a code bundle for Create Online Portfolio. The original project is avail
 
 ## Running the code
 
-Run `npm i` to install the dependencies.
+```bash
+npm i
+npm run dev
+```
 
-Run `npm run dev` to start the development server.
+## Environment
+
+Copy `.env.example` to `.env.local` and fill in values. `.env*` files are git-ignored.
+
+```bash
+cp .env.example .env.local
+```
+
+Required values are documented in `.env.example`. The same keys must be added to Vercel → Settings → Environment Variables for production builds.
+
+---
 
 ## Images (Cloudinary)
 
-Project images are served from [Cloudinary](https://cloudinary.com/). The frontend only needs the Cloudinary **cloud name** — API Key and API Secret are **never** used in the client and must never be committed to this repository.
+The frontend only uses the Cloudinary **cloud name** + an **unsigned upload preset**. The Cloudinary **API Key** and **API Secret** are never shipped to the browser; they are server-only credentials.
 
-### Setup
+### One-time Cloudinary setup
 
-1. Copy `.env.example` to `.env.local`:
+1. Create an **unsigned upload preset** at Cloudinary → Settings → Upload → Upload presets:
+   - Signing mode: **Unsigned**
+   - Folder: `portfolio/uploads`
+   - Allowed formats: `jpg, png, webp, avif, svg`
+   - Max file size: reasonable limit (e.g. 10 MB)
+2. Copy the preset name into `VITE_CLOUDINARY_UPLOAD_PRESET` in `.env.local` (and in Vercel).
 
-   ```bash
-   cp .env.example .env.local
-   ```
-
-2. Set `VITE_CLOUDINARY_CLOUD_NAME` to your Cloudinary cloud name in `.env.local`. `.env.local` is git-ignored.
-
-### Adding images
-
-Use the `cldImage` helper to build delivery URLs:
+### Using the helper
 
 ```ts
 import { cldImage } from '@/app/lib/cloudinary';
-
 const hero = cldImage('portfolio/dynamic-modular/hero');
-const heroLg = cldImage('portfolio/dynamic-modular/hero', { width: 1600, crop: 'limit' });
 ```
 
-The helper adds `f_auto,q_auto,dpr_auto` by default so Cloudinary serves the best format and quality for each device.
+`cldImage` appends `f_auto,q_auto,dpr_auto` by default.
 
-### Required `public_id`s
-
-Upload the following assets to Cloudinary with these exact `public_id`s (upload to the matching folder path in the Media Library):
-
-**`portfolio/dynamic-modular/`**
+### Pre-existing `public_id`s (`portfolio/dynamic-modular/`)
 
 | `public_id` | Description |
 | --- | --- |
 | `hero` | Project hero image |
-| `mask` | Mask illustration (Background section) |
+| `mask` | Mask illustration (Background) |
 | `target` | Target diagram |
-| `concept-unit` | Concept — Unit elevation |
-| `concept-module-rail` | Concept — Module & rail system |
-| `unit-1` | Unit 1 — 실험실 UNIT |
-| `unit-2` | Unit 2 — 연구실 UNIT |
-| `unit-3` | Unit 3 — 다목적 UNIT |
+| `concept-unit` | Concept — unit elevation |
+| `concept-module-rail` | Concept — module & rail system |
+| `unit-1` · `unit-2` · `unit-3` | Unit diagrams |
 | `unit-combines` | Unit combines overview |
-| `floor-5` | Floor plan — 5F |
-| `floor-6` | Floor plan — 6F |
-| `floor-7` | Floor plan — 7F |
-| `render-1` | 3D render — Research lab |
-| `render-2` | 3D render — Lounge & community |
-| `render-3` | 3D render — Bio exhibition |
+| `floor-5` · `floor-6` · `floor-7` | Floor plans |
+| `render-1` · `render-2` · `render-3` | 3D renders |
+
+---
+
+## Admin / editable content (Firebase)
+
+Site content (hero text, name, bio, contact info, project images) is editable at runtime by an authenticated admin. Edits and uploaded images persist in Firestore and Cloudinary; page refreshes keep them.
+
+### Architecture
+
+- **Auth:** Firebase Authentication (email/password).
+- **Content store:** Firestore single document `content/site` holds all editable strings and image URLs as key/value pairs.
+- **Image uploads:** Client uploads directly to Cloudinary via the unsigned preset above; the returned `secure_url` is saved in Firestore.
+
+### One-time Firebase setup
+
+1. In Firebase Console → Authentication → Sign-in method, enable **Email/Password**.
+2. Authentication → Users → Add user: create your admin account with a strong password. This replaces the old hardcoded `0000` password.
+3. Firestore → Create database (production mode is fine).
+4. Deploy the security rules from `firestore.rules` (via Firebase CLI `firebase deploy --only firestore:rules`, or paste them in the Firestore Rules editor).
+5. In Google Cloud Console → APIs & Services → Credentials → edit your web API key → add HTTP referrer restrictions (your Vercel domain + `localhost`) so the key can only be used from your sites.
 
 ### Security notes
 
-- `.env*` files are git-ignored (except `.env.example`).
-- Only the cloud name is exposed to the browser — that value is already part of every delivered image URL, so it is safe to ship.
-- Keep your Cloudinary **API Key** and **API Secret** on trusted machines only. They are required for signed uploads and admin operations, neither of which this project performs on the client.
-- If you ever add uploads from the app, do them through a small backend endpoint that signs requests with the API Secret on the server side; never ship the Secret to the browser.
+- **Never** commit Firebase or Cloudinary secrets. `.env*` is git-ignored (except `.env.example`).
+- Firebase `apiKey` is a public identifier (not a secret). Its abuse potential is limited by:
+  - Firestore security rules (`firestore.rules` — reads public, writes require auth).
+  - HTTP referrer restrictions on the API key in Google Cloud Console.
+- The Cloudinary unsigned upload preset allows anyone with the preset name to upload to the configured folder. Keep the folder scoped (`portfolio/uploads`) and restrict allowed formats; rotate the preset if it is abused.
+- The old hardcoded admin password (`0000`) has been removed. There is no fallback — admin access requires a real Firebase user.
+
+### Using editable components
+
+```tsx
+import { EditableText } from '@/app/components/admin/EditableText';
+import { EditableImage } from '@/app/components/admin/EditableImage';
+
+<EditableText contentKey="hero.title" defaultValue="PORTFOLIO" as="span" className="..." />
+<EditableImage contentKey="projects.hero" defaultSrc={heroUrl} alt="Hero" className="..." />
+```
+
+- When no admin is signed in, the component renders the stored value (or the default if nothing stored).
+- When an admin is signed in, text becomes click-to-edit and images show an upload button.
+- Saves go straight to Firestore; all clients see the update via Firestore's `onSnapshot`.
+
+### Currently editable fields
+
+- `hero.title`, `hero.name`
+- `about.name`, `about.bio`, `about.experience.year`, `about.experience.title`
+- `contact.email`, `contact.phone`
+
+Adding more is purely additive — wrap any text with `<EditableText contentKey="..." defaultValue="..." />` and it becomes editable in admin mode with persistence.
