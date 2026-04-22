@@ -8,7 +8,13 @@ export type ModuleType =
   | 'image'
   | 'image-grid-2'
   | 'image-grid-3'
-  | 'full-image';
+  | 'full-image'
+  | 'image-text-2'
+  | 'image-text-3'
+  | 'text-image-split'
+  | 'eyebrow-title'
+  | 'numbered-list-3'
+  | 'image-mosaic-3';
 
 export type ProjectModule = {
   id: string;
@@ -22,6 +28,12 @@ export const MODULE_LABELS: Record<ModuleType, string> = {
   'image-grid-2': '이미지 2열',
   'image-grid-3': '이미지 3열',
   'full-image': '전체 폭 이미지',
+  'image-text-2': '이미지+설명 2열',
+  'image-text-3': '이미지+설명 3열',
+  'text-image-split': '텍스트 + 이미지 (좌우 분할)',
+  'eyebrow-title': '라벨 + 큰 제목',
+  'numbered-list-3': '숫자 리스트 3개 (01/02/03)',
+  'image-mosaic-3': '이미지 모자이크 (7+5 / 전체)',
 };
 
 export type UseProjectModulesResult = {

@@ -13,11 +13,17 @@ type ProjectModulesProps = {
 
 const PALETTE: ModuleType[] = [
   'heading',
+  'eyebrow-title',
   'text',
   'image',
+  'full-image',
   'image-grid-2',
   'image-grid-3',
-  'full-image',
+  'image-mosaic-3',
+  'image-text-2',
+  'image-text-3',
+  'text-image-split',
+  'numbered-list-3',
 ];
 
 export function ProjectModules({ projectId }: ProjectModulesProps) {
