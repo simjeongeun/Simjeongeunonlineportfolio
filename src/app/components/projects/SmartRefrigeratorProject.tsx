@@ -29,6 +29,7 @@ export function SmartRefrigeratorProject() {
 
   return (
     <ProjectDetailTemplate
+      projectId="smart-refrigerator"
       title="Smart Refrigerator Project"
       subtitle="학생들의 학교 생활을 위한 스마트 냉장고 디자인 프로젝트"
       category="Startup Project"

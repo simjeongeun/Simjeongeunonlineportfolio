@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
+import { EditableText } from './admin/EditableText';
 
 interface NavigationProps {
   activeSection?: string;
@@ -62,7 +63,10 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
               onClick={() => scrollToSection(item.id)}
               className="relative group"
             >
-              <span 
+              <EditableText
+                contentKey={`nav.${item.id}`}
+                defaultValue={item.label}
+                as="span"
                 className="transition-colors duration-200 group-hover:text-[#0057FF]"
                 style={{
                   fontFamily: 'Inter, Pretendard, sans-serif',
@@ -70,11 +74,9 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
                   fontSize: '15px',
                   color: activeSection === item.id ? '#0057FF' : '#1A1A1A',
                 }}
-              >
-                {item.label}
-              </span>
+              />
               {activeSection === item.id && (
-                <span 
+                <span
                   className="absolute -bottom-1 left-1/2 transform -translate-x-1/2"
                   style={{
                     width: '4px',
@@ -109,7 +111,10 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
                 onClick={() => scrollToSection(item.id)}
                 className="relative"
               >
-                <span
+                <EditableText
+                  contentKey={`nav.${item.id}`}
+                  defaultValue={item.label}
+                  as="span"
                   className="transition-colors duration-200"
                   style={{
                     fontFamily: 'Inter, Pretendard, sans-serif',
@@ -117,9 +122,7 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
                     fontSize: '16px',
                     color: activeSection === item.id ? '#0057FF' : '#1A1A1A',
                   }}
-                >
-                  {item.label}
-                </span>
+                />
               </button>
             ))}
           </div>

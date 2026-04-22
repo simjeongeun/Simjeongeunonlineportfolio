@@ -6,6 +6,7 @@ import { FragmentsProject } from "./components/projects/FragmentsProject";
 import { ReframeProject } from "./components/projects/ReframeProject";
 import { SmartRefrigeratorProject } from "./components/projects/SmartRefrigeratorProject";
 import { AquaSwarmProject } from "./components/projects/AquaSwarmProject";
+import { GenericProject } from "./components/projects/GenericProject";
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,10 @@ export const router = createBrowserRouter([
       {
         path: "projects/aquaswarm",
         element: <AquaSwarmProject />,
+      },
+      {
+        path: "projects/:slug",
+        element: <GenericProject />,
       },
       {
         path: "*",
