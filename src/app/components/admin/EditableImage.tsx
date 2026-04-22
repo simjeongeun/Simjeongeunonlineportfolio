@@ -41,6 +41,20 @@ function measureSectionInnerWidth(el: HTMLElement | null): number {
   return Math.max(0, section.clientWidth - padL - padR);
 }
 
+// Pull out classes that control width/margin so the outer container
+// (which wraps both the image box and the status bar in admin mode) can
+// share the same width as the image — keeping the bar's horizontal
+// edges flush with the image above it.
+function extractSizingClasses(className?: string): string {
+  if (!className) return '';
+  return className
+    .split(/\s+/)
+    .filter((c) =>
+      /^(sm:|md:|lg:|xl:|2xl:)?(w-|max-w-|min-w-|mx-|ml-|mr-)/.test(c)
+    )
+    .join(' ');
+}
+
 function extractAspectFromClassName(className?: string): string | undefined {
   if (!className) return undefined;
   const arb = className.match(/\baspect-\[(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\]/);
@@ -441,12 +455,37 @@ export function EditableImage({
 
   const adminWrapperStyle: CSSProperties = {
     ...wrapperStyle,
+    width: '100%',
     outline: '1px dashed rgba(0, 87, 255, 0.4)',
     outlineOffset: '2px',
   };
+  if (isManual) {
+    // In manual mode the outer container owns the width, so the inner
+    // image box just fills it. Reset the inner width / negative margins
+    // that wrapperStyle would otherwise set.
+    adminWrapperStyle.width = '100%';
+    adminWrapperStyle.marginLeft = 0;
+    adminWrapperStyle.marginRight = 0;
+  }
+
+  const outerSizingClass = extractSizingClasses(className);
+  const outerStyle: CSSProperties = {};
+  if (isManual) {
+    const w = effectiveWidthPx ?? parentWidth ?? 800;
+    const overflow = parentWidth > 0 ? Math.max(0, (w - parentWidth) / 2) : 0;
+    outerStyle.width = `${w}px`;
+    outerStyle.maxWidth = 'none';
+    if (overflow > 0) {
+      outerStyle.marginLeft = `-${overflow}px`;
+      outerStyle.marginRight = `-${overflow}px`;
+    } else {
+      outerStyle.marginLeft = 'auto';
+      outerStyle.marginRight = 'auto';
+    }
+  }
 
   return (
-    <div className="w-full">
+    <div className={outerSizingClass || 'w-full'} style={outerStyle}>
       <div ref={wrapperRef} className={className} style={adminWrapperStyle}>
         {hasImage ? (
           <img
