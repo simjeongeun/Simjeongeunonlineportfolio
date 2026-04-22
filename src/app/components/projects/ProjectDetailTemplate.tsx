@@ -1,10 +1,11 @@
 import { motion } from 'motion/react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ImagePlus, Type } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { ReactNode } from 'react';
 import { EditableText } from '../admin/EditableText';
 import { EditableImage } from '../admin/EditableImage';
-import { useContentValue } from '../../lib/content';
+import { useContent, useContentValue } from '../../lib/content';
+import { useAuth } from '../../lib/auth';
 import { ProjectModules } from '../project-modules/ProjectModules';
 
 interface ProjectDetailTemplateProps {
@@ -30,8 +31,21 @@ export function ProjectDetailTemplate({
   children,
 }: ProjectDetailTemplateProps) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const { set } = useContent();
   const k = (field: string) => `projects.${projectId}.${field}`;
-  const effectiveHero = useContentValue(k('hero.image'), heroImage ?? '');
+
+  const defaultLayout = heroImage ? 'hero' : 'plain';
+  const layoutStyle = useContentValue(k('layout.style'), defaultLayout);
+  const useHeroLayout = layoutStyle === 'hero';
+
+  const toggleLayout = async () => {
+    try {
+      await set(k('layout.style'), useHeroLayout ? 'plain' : 'hero');
+    } catch (err) {
+      alert('레이아웃 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
 
   return (
     <motion.div
@@ -65,8 +79,38 @@ export function ProjectDetailTemplate({
         </button>
       </div>
 
-      {/* Hero Image + Title */}
-      {effectiveHero && (
+      {/* Admin: Layout toggle */}
+      {isAdmin && (
+        <div className="fixed top-4 right-4 md:top-12 md:right-12 z-50">
+          <button
+            type="button"
+            onClick={toggleLayout}
+            className="flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 bg-white/90 backdrop-blur-sm border border-[#E5E5E5] rounded-full hover:border-[#0057FF] hover:text-[#0057FF] transition-colors duration-200 shadow-sm"
+            style={{
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontWeight: 500,
+              fontSize: '12px',
+              letterSpacing: '0.03em',
+            }}
+            title="히어로 이미지 스타일 ON/OFF"
+          >
+            {useHeroLayout ? <ImagePlus size={14} /> : <Type size={14} />}
+            <span>{useHeroLayout ? '히어로 스타일' : '기본 스타일'}</span>
+            <span
+              className="inline-block w-8 h-4 rounded-full relative transition-colors"
+              style={{ background: useHeroLayout ? '#0057FF' : '#CCCCCC' }}
+            >
+              <span
+                className="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all"
+                style={{ left: useHeroLayout ? 18 : 2 }}
+              />
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Hero Image + Title (shown when hero layout selected) */}
+      {useHeroLayout && (
         <motion.div
           className="w-full"
           initial={{ opacity: 0 }}
@@ -122,7 +166,7 @@ export function ProjectDetailTemplate({
             }}
           />
 
-          {!effectiveHero && (
+          {!useHeroLayout && (
             <EditableText
               contentKey={k('title')}
               defaultValue={title}

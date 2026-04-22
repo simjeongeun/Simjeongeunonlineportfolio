@@ -22,6 +22,7 @@ const PALETTE: ModuleType[] = [
   'image-mosaic-3',
   'image-text-2',
   'image-text-3',
+  'image-details-3',
   'text-image-split',
   'numbered-list-3',
 ];

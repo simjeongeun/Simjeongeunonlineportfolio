@@ -335,6 +335,71 @@ export function ModuleRenderer({ projectId, module }: ModuleRendererProps) {
         </motion.div>
       );
 
+    case 'image-details-3':
+      return (
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-3 gap-10"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+        >
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="flex flex-col">
+              <div className="mb-6">
+                <EditableImage
+                  contentKey={k(`image-${n}`)}
+                  defaultSrc=""
+                  alt=""
+                  className="w-full object-contain"
+                  folder={folder}
+                />
+              </div>
+              <EditableText
+                contentKey={k(`eyebrow-${n}`)}
+                defaultValue="Floor"
+                as="span"
+                className="text-[#5bc0cc] mb-1 block"
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '11px',
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                }}
+              />
+              <EditableText
+                contentKey={k(`title-${n}`)}
+                defaultValue={`${4 + n}F`}
+                as="h3"
+                className="text-[#1A1A1A] mb-4 block"
+                style={{
+                  fontFamily: 'Inter, Pretendard, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '24px',
+                  letterSpacing: '-0.01em',
+                }}
+              />
+              <div className="w-8 h-px bg-[#E0E0E0] mb-4" />
+              <EditableText
+                contentKey={k(`body-${n}`)}
+                defaultValue={'항목 1\n항목 2\n항목 3'}
+                as="div"
+                multiline
+                className="text-[#666666]"
+                style={{
+                  fontFamily: 'Inter, Pretendard, sans-serif',
+                  fontWeight: 300,
+                  fontSize: '13px',
+                  lineHeight: '1.8',
+                  whiteSpace: 'pre-line',
+                }}
+              />
+            </div>
+          ))}
+        </motion.div>
+      );
+
     case 'image-mosaic-3':
       return (
         <motion.div
