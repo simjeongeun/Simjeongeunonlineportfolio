@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Plus } from 'lucide-react';
+import { Menu, X, Plus, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -63,10 +63,20 @@ function NavItemButton({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative group/item flex items-center gap-1"
+      className="relative group/item flex items-center gap-1.5"
       {...attributes}
       {...listeners}
     >
+      {isAdmin && (
+        <span
+          className="text-[#BBBBBB] group-hover/item:text-[#0057FF] transition-colors duration-200"
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          aria-hidden
+          title="드래그로 순서 변경"
+        >
+          <GripVertical size={size === 'mobile' ? 16 : 14} />
+        </span>
+      )}
       <button
         onClick={() => onScroll(item.id)}
         className="relative group"
