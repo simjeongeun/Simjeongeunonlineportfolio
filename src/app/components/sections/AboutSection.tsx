@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { EditableText } from '../admin/EditableText';
 import { ExperienceList } from '../ExperienceList';
+import { ProjectModules } from '../project-modules/ProjectModules';
 
 export function AboutSection() {
   return (
@@ -77,6 +78,8 @@ export function AboutSection() {
             />
             <ExperienceList />
           </div>
+
+          <ProjectModules projectId="main-about" />
         </motion.div>
       </div>
     </section>
