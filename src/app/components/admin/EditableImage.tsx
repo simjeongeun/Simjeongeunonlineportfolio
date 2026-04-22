@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Check, Upload, Trash2 } from 'lucide-react';
+import { Check, Upload, Trash2, Move, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useContent } from '../../lib/content';
 import { uploadToCloudinary } from '../../lib/cloudinary-upload';
@@ -24,6 +24,8 @@ const ASPECT_PRESETS: { label: string; value: string | undefined }[] = [
   { label: '9:16', value: '9 / 16' },
 ];
 
+const DEFAULT_POSITION = '50% 50%';
+
 function normalizeAspect(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -38,6 +40,21 @@ function normalizeAspect(input: string): string | null {
   return null;
 }
 
+function parsePosition(value: string): { x: number; y: number } {
+  const parts = value.trim().split(/\s+/);
+  if (parts.length !== 2) return { x: 50, y: 50 };
+  const x = parseFloat(parts[0]);
+  const y = parseFloat(parts[1]);
+  return {
+    x: isNaN(x) ? 50 : Math.max(0, Math.min(100, x)),
+    y: isNaN(y) ? 50 : Math.max(0, Math.min(100, y)),
+  };
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
 export function EditableImage({
   contentKey,
   defaultSrc,
@@ -50,21 +67,84 @@ export function EditableImage({
   const { get, set } = useContent();
   const current = get(contentKey, defaultSrc);
   const storedAspect = get(`${contentKey}.aspect`, '');
+  const storedPosition = get(`${contentKey}.position`, DEFAULT_POSITION);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [customError, setCustomError] = useState<string | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [livePosition, setLivePosition] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     setDims(null);
     setCustomError(null);
   }, [current]);
 
+  useEffect(() => {
+    setLivePosition(null);
+  }, [storedPosition]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const img = imgRef.current;
+    const wrapper = wrapperRef.current;
+    if (!img || !wrapper) return;
+    const rect = wrapper.getBoundingClientRect();
+    const start = parsePosition(storedPosition);
+    const startPointer = { x: 0, y: 0, set: false };
+    let lastPos = { ...start };
+
+    const onMove = (e: PointerEvent) => {
+      if (!startPointer.set) {
+        startPointer.x = e.clientX;
+        startPointer.y = e.clientY;
+        startPointer.set = true;
+        return;
+      }
+      const dxPct = ((e.clientX - startPointer.x) / rect.width) * 100;
+      const dyPct = ((e.clientY - startPointer.y) / rect.height) * 100;
+      // Dragging right should reveal more of the left side of the image;
+      // object-position X increases as we subtract drag X.
+      lastPos = {
+        x: clamp(start.x - dxPct, 0, 100),
+        y: clamp(start.y - dyPct, 0, 100),
+      };
+      setLivePosition(`${lastPos.x.toFixed(1)}% ${lastPos.y.toFixed(1)}%`);
+    };
+
+    const onUp = async () => {
+      setDragging(false);
+      const finalPos = `${lastPos.x.toFixed(1)}% ${lastPos.y.toFixed(1)}%`;
+      if (finalPos !== storedPosition) {
+        try {
+          await set(`${contentKey}.position`, finalPos);
+        } catch (err) {
+          console.error('[EditableImage] position save failed', err);
+        }
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [dragging, storedPosition, contentKey, set]);
+
   const handleImgLoad = () => {
     const img = imgRef.current;
     if (img) setDims({ w: img.naturalWidth, h: img.naturalHeight });
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!isAdmin || !current) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    setDragging(true);
   };
 
   const pickFile = () => fileRef.current?.click();
@@ -91,6 +171,7 @@ export function EditableImage({
     try {
       await set(contentKey, '');
       await set(`${contentKey}.aspect`, '');
+      await set(`${contentKey}.position`, '');
     } catch (err) {
       alert('이미지 제거 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -120,15 +201,21 @@ export function EditableImage({
     }
   };
 
+  const resetPosition = async () => {
+    try {
+      await set(`${contentKey}.position`, '');
+    } catch (err) {
+      alert('위치 초기화 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   const hasImage = current.length > 0;
   const aspectOverride = storedAspect.length > 0 ? storedAspect : undefined;
   const matchingPreset = ASPECT_PRESETS.find((p) => (p.value ?? '') === (aspectOverride ?? ''));
   const isCustom = !!aspectOverride && !matchingPreset;
+  const effectivePosition = livePosition ?? storedPosition;
+  const isRepositioned = storedPosition !== DEFAULT_POSITION && storedPosition !== '';
 
-  // Use the classic "aspect-ratio'd wrapper + absolutely positioned image"
-  // pattern. The wrapper owns the box; the image is forced to fill it via
-  // position:absolute + width/height 100% + object-fit:cover. This is
-  // rock-solid across browsers and guarantees the aspect override wins.
   const wrapperStyle: CSSProperties = {
     ...style,
     position: 'relative',
@@ -142,6 +229,7 @@ export function EditableImage({
     width: '100%',
     height: '100%',
     objectFit: 'cover',
+    objectPosition: effectivePosition,
     display: 'block',
   };
 
@@ -162,14 +250,21 @@ export function EditableImage({
 
   return (
     <div className="w-full">
-      <div className={className} style={adminWrapperStyle}>
+      <div ref={wrapperRef} className={className} style={adminWrapperStyle}>
         {hasImage ? (
           <img
             ref={imgRef}
             src={current}
             alt={alt}
             onLoad={handleImgLoad}
-            style={fillStyle}
+            onPointerDown={handlePointerDown}
+            draggable={false}
+            style={{
+              ...fillStyle,
+              cursor: dragging ? 'grabbing' : 'grab',
+              userSelect: 'none',
+              touchAction: 'none',
+            }}
           />
         ) : (
           <div
@@ -187,6 +282,23 @@ export function EditableImage({
             }}
           >
             이미지 없음 — 아래 "업로드" 버튼을 누르세요
+          </div>
+        )}
+        {hasImage && (
+          <div
+            className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full pointer-events-none"
+            style={{
+              background: dragging ? 'rgba(0,87,255,0.9)' : 'rgba(0,0,0,0.55)',
+              color: 'white',
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: '0.03em',
+              transition: 'background 120ms',
+            }}
+          >
+            <Move size={12} />
+            <span>{dragging ? '위치 조정 중…' : '드래그로 위치 조정'}</span>
           </div>
         )}
       </div>
@@ -271,6 +383,22 @@ export function EditableImage({
         <span className="text-[#666]">
           원본 크기: {dims ? `${dims.w} × ${dims.h} px` : hasImage ? '…' : '없음'}
         </span>
+
+        {hasImage && isRepositioned && (
+          <>
+            <span className="w-px h-4 bg-[#DCE4EE]" />
+            <button
+              type="button"
+              onClick={resetPosition}
+              className="flex items-center gap-1 px-2 py-0.5 rounded border border-[#DDD] text-[#1A1A1A] hover:border-[#0057FF] hover:text-[#0057FF] transition-colors"
+              style={{ fontSize: 11 }}
+              title="이미지 위치를 중앙으로 초기화"
+            >
+              <RotateCcw size={11} />
+              <span>위치 중앙으로</span>
+            </button>
+          </>
+        )}
 
         <div className="flex items-center gap-2 ml-auto">
           <button
