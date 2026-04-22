@@ -82,7 +82,7 @@ function NavItemButton({
         className="relative group"
       >
         <EditableText
-          contentKey={`section.${item.id}.heading`}
+          contentKey={`nav.${item.id}.label`}
           defaultValue={item.label}
           as="span"
           className="transition-colors duration-200 group-hover:text-[#0057FF]"
