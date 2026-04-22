@@ -1,11 +1,12 @@
 import { Navigation } from './Navigation';
 import { InteractiveArtwork } from './InteractiveArtwork';
 import { motion } from 'motion/react';
-import { ArrowRight, Mail, Phone, Settings } from 'lucide-react';
+import { ArrowRight, Mail, Phone, Settings, Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
 import { useContentValue } from '../lib/content';
+import { useProjects, type Project } from '../lib/projects';
 import { EditableText } from './admin/EditableText';
 import { AdminLoginModal } from './admin/AdminLoginModal';
 
@@ -17,49 +18,39 @@ export function MainPortfolio() {
   const [activeSection, setActiveSection] = useState('work');
   const [loginOpen, setLoginOpen] = useState(false);
   const { isAdmin, signOut } = useAuth();
+  const { projects, addProject, removeProject, reorderProjects } = useProjects();
 
   const email = useContentValue('contact.email', DEFAULT_EMAIL);
   const phone = useContentValue('contact.phone', DEFAULT_PHONE);
   const telHref = `tel:${phone.replace(/[^\d+]/g, '')}`;
 
-  const projects = [
-    {
-      title: 'Dynamic Modular Bio-Incubation Center',
-      subtitle: '다이나믹 모듈러 바이오 인큐베이션 센터',
-      category: 'Design Project',
-      path: '/projects/dynamic-modular',
-    },
-    {
-      title: 'Green Visuals & Experiential Branding at Osulloc',
-      subtitle: '오설록의 친환경 비주얼 및 체험형 브랜딩, 소비자 주의력에 대한 시선 추적 연구',
-      category: 'Design Project',
-      path: '/projects/osulloc',
-    },
-    {
-      title: 'Fragments of Light, Movements of Emotion',
-      subtitle: '빛의 조각과 감정의 흐름 주제의 호텔 리디자인',
-      category: 'Design Project',
-      path: '/projects/fragments',
-    },
-    {
-      title: 'RE:FRAME',
-      subtitle: '삶의 변화에 맞춰 해체하고 조립하는 반응형 가구',
-      category: 'Design Project',
-      path: '/projects/reframe',
-    },
-    {
-      title: 'Smart Refrigerator Project',
-      subtitle: '학생들의 학교 생활을 위한 스마트 냉장고 디자인 프로젝트',
-      category: 'Startup Project',
-      path: '/projects/smart-refrigerator',
-    },
-    {
-      title: 'AquaSwarm',
-      subtitle: '모듈형 해양 미세플라스틱 포집 솔루션',
-      category: 'Startup Project',
-      path: '/projects/aquaswarm',
-    },
-  ];
+  const handleAdd = async () => {
+    try {
+      const created = await addProject({ title: 'New Project', subtitle: '프로젝트 설명' });
+      navigate(created.path);
+    } catch (err) {
+      alert('추가 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleRemove = async (id: string, title: string) => {
+    if (!confirm(`"${title}" 프로젝트를 목록에서 삭제할까요?`)) return;
+    try {
+      await removeProject(id);
+    } catch (err) {
+      alert('삭제 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleMove = async (fromIdx: number, direction: -1 | 1) => {
+    const toIdx = fromIdx + direction;
+    if (toIdx < 0 || toIdx >= projects.length) return;
+    try {
+      await reorderProjects(fromIdx, toIdx);
+    } catch (err) {
+      alert('순서 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
 
   // Track active section based on scroll position
   useEffect(() => {
@@ -163,15 +154,37 @@ export function MainPortfolio() {
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           {projects.map((project, index) => (
-            <ProjectRow
-              key={index}
-              title={project.title}
-              subtitle={project.subtitle}
-              category={project.category}
+            <ProjectRowContainer
+              key={project.id}
+              project={project}
+              index={index}
+              total={projects.length}
+              isAdmin={isAdmin}
               delay={0.1 * index}
-              onClick={() => navigate(project.path)}
+              onOpen={() => navigate(project.path)}
+              onRemove={() => handleRemove(project.id, project.title)}
+              onMoveUp={() => handleMove(index, -1)}
+              onMoveDown={() => handleMove(index, 1)}
             />
           ))}
+          {isAdmin && (
+            <motion.button
+              onClick={handleAdd}
+              className="w-full flex items-center justify-center gap-3 py-8 md:py-10 border-b border-dashed border-[#DDDDDD] text-[#999999] hover:text-[#0057FF] hover:border-[#0057FF] transition-colors duration-200"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              style={{
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontWeight: 400,
+                fontSize: '14px',
+                letterSpacing: '0.05em',
+              }}
+            >
+              <Plus size={16} />
+              <span>프로젝트 추가</span>
+            </motion.button>
+          )}
         </motion.div>
       </section>
 
@@ -394,28 +407,44 @@ export function MainPortfolio() {
   );
 }
 
-interface ProjectRowProps {
-  title: string;
-  subtitle: string;
-  category: string;
+interface ProjectRowContainerProps {
+  project: Project;
+  index: number;
+  total: number;
+  isAdmin: boolean;
   delay: number;
-  onClick: () => void;
+  onOpen: () => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }
 
-function ProjectRow({ title, subtitle, category, delay, onClick }: ProjectRowProps) {
+function ProjectRowContainer({
+  project,
+  index,
+  total,
+  isAdmin,
+  delay,
+  onOpen,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+}: ProjectRowContainerProps) {
+  const k = `projects.${project.id}`;
   return (
     <motion.div
-      className="group cursor-pointer border-b border-[#EEEEEE] py-6 md:py-8 px-2 md:px-6 transition-all duration-300 hover:bg-[#F9F9F9]"
+      className="group relative cursor-pointer border-b border-[#EEEEEE] py-6 md:py-8 px-2 md:px-6 transition-all duration-300 hover:bg-[#F9F9F9]"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay }}
-      onClick={onClick}
+      onClick={isAdmin ? undefined : onOpen}
     >
       <div className="flex items-center justify-between gap-4 md:gap-8">
-        {/* Left: Project Info */}
         <div className="flex-1 min-w-0">
-          {/* Category */}
-          <p
+          <EditableText
+            contentKey={`${k}.category`}
+            defaultValue={project.category}
+            as="p"
             className="text-[#999999] mb-1 md:mb-2"
             style={{
               fontFamily: 'Inter, Pretendard, sans-serif',
@@ -424,52 +453,93 @@ function ProjectRow({ title, subtitle, category, delay, onClick }: ProjectRowPro
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
             }}
-          >
-            {category}
-          </p>
-
-          {/* Title */}
-          <h3
+          />
+          <EditableText
+            contentKey={`${k}.title`}
+            defaultValue={project.title}
+            as="h3"
             className="text-[#1A1A1A] mb-1 md:mb-2 text-[16px] md:text-[20px] lg:text-[24px]"
             style={{
               fontFamily: 'Inter, Pretendard, sans-serif',
               fontWeight: 700,
               letterSpacing: '0.01em',
             }}
-          >
-            {title}
-          </h3>
-
-          {/* Subtitle */}
-          <p
+          />
+          <EditableText
+            contentKey={`${k}.subtitle`}
+            defaultValue={project.subtitle}
+            as="p"
             className="text-[#666666] text-[12px] md:text-[14px]"
             style={{
               fontFamily: 'Inter, Pretendard, sans-serif',
               fontWeight: 300,
               letterSpacing: '0.02em',
             }}
-          >
-            {subtitle}
-          </p>
+          />
         </div>
 
-        {/* Right: View Project Button */}
-        <div className="flex-shrink-0 flex items-center gap-2 md:gap-3 text-[#1A1A1A] opacity-60 group-hover:opacity-100 transition-opacity duration-300">
-          <span
-            className="hidden sm:inline"
-            style={{
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontWeight: 500,
-              fontSize: '14px',
-              letterSpacing: '0.05em',
-            }}
-          >
-            View Project
-          </span>
-          <ArrowRight 
-            className="transition-transform duration-300 group-hover:translate-x-1" 
-            size={20} 
-          />
+        <div className="flex-shrink-0 flex items-center gap-2 md:gap-3">
+          {isAdmin ? (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={onMoveUp}
+                disabled={index === 0}
+                className="p-1.5 text-[#999999] hover:text-[#0057FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="위로 이동"
+              >
+                <ChevronUp size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={onMoveDown}
+                disabled={index === total - 1}
+                className="p-1.5 text-[#999999] hover:text-[#0057FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="아래로 이동"
+              >
+                <ChevronDown size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={onOpen}
+                className="px-3 py-1.5 text-[#1A1A1A] border border-[#DDDDDD] rounded-full hover:bg-[#1A1A1A] hover:text-white transition-all duration-200"
+                style={{
+                  fontFamily: 'Inter, Pretendard, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '11px',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                onClick={onRemove}
+                className="p-1.5 text-[#999999] hover:text-[#D00] transition-colors"
+                aria-label="삭제"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 md:gap-3 text-[#1A1A1A] opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+              <span
+                className="hidden sm:inline"
+                style={{
+                  fontFamily: 'Inter, Pretendard, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                View Project
+              </span>
+              <ArrowRight
+                className="transition-transform duration-300 group-hover:translate-x-1"
+                size={20}
+              />
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
