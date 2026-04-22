@@ -9,6 +9,9 @@ import { useContentValue } from '../lib/content';
 import { useProjects, type Project } from '../lib/projects';
 import { EditableText } from './admin/EditableText';
 import { AdminLoginModal } from './admin/AdminLoginModal';
+import { ExperienceList } from './ExperienceList';
+import { ContactSocialLinks } from './ContactSocialLinks';
+import { DynamicSections } from './DynamicSections';
 
 const DEFAULT_EMAIL = 'simjeongeun@example.com';
 const DEFAULT_PHONE = '+82 10-8432-5901';
@@ -263,32 +266,7 @@ export function MainPortfolio() {
                 }}
               />
               
-              <div className="space-y-4">
-                <div className="border-l-2 border-[#0057FF] pl-6 py-2">
-                  <EditableText
-                    contentKey="about.experience.year"
-                    defaultValue="2023 - 2026"
-                    as="p"
-                    className="text-[#666666]"
-                    style={{
-                      fontFamily: 'Inter, Pretendard, sans-serif',
-                      fontWeight: 500,
-                      fontSize: '14px',
-                    }}
-                  />
-                  <EditableText
-                    contentKey="about.experience.title"
-                    defaultValue="Space Design Projects & Innovations"
-                    as="p"
-                    className="text-[#1A1A1A]"
-                    style={{
-                      fontFamily: 'Inter, Pretendard, sans-serif',
-                      fontWeight: 500,
-                      fontSize: '16px',
-                    }}
-                  />
-                </div>
-              </div>
+              <ExperienceList />
             </div>
           </motion.div>
         </div>
@@ -362,6 +340,8 @@ export function MainPortfolio() {
                 />
               </a>
             </div>
+
+            <ContactSocialLinks />
           </motion.div>
 
           {/* Footer */}
@@ -418,6 +398,8 @@ export function MainPortfolio() {
           </motion.div>
         </div>
       </section>
+
+      <DynamicSections />
 
       <AdminLoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
     </div>

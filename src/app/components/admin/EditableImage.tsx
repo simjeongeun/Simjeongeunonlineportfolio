@@ -70,7 +70,10 @@ export function EditableImage({
     }
   };
 
+  const hasImage = current.length > 0;
+
   if (!isAdmin) {
+    if (!hasImage) return null;
     return <img src={current} alt={alt} className={className} style={style} />;
   }
 
@@ -87,17 +90,37 @@ export function EditableImage({
         outlineOffset: '2px',
       }}
     >
-      <img
-        src={current}
-        alt={alt}
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          objectFit,
-          objectPosition,
-        }}
-      />
+      {hasImage ? (
+        <img
+          src={current}
+          alt={alt}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            objectFit,
+            objectPosition,
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            minHeight: 120,
+            background: 'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#999999',
+            fontFamily: 'Inter, Pretendard, sans-serif',
+            fontSize: 13,
+            letterSpacing: '0.05em',
+          }}
+        >
+          이미지 없음 — 아래 버튼으로 업로드
+        </div>
+      )}
       <button
         type="button"
         onClick={pickFile}

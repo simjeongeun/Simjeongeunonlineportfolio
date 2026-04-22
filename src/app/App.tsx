@@ -4,6 +4,8 @@ import { AuthProvider } from './lib/auth';
 import { ContentProvider } from './lib/content';
 import { ProjectsProvider } from './lib/projects';
 import { NavProvider } from './lib/nav';
+import { ExperienceProvider } from './lib/experience';
+import { SocialLinksProvider } from './lib/social-links';
 
 export default function App() {
   return (
@@ -11,7 +13,11 @@ export default function App() {
       <ContentProvider>
         <ProjectsProvider>
           <NavProvider>
-            <RouterProvider router={router} />
+            <ExperienceProvider>
+              <SocialLinksProvider>
+                <RouterProvider router={router} />
+              </SocialLinksProvider>
+            </ExperienceProvider>
           </NavProvider>
         </ProjectsProvider>
       </ContentProvider>
