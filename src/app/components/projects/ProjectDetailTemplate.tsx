@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 import { EditableText } from '../admin/EditableText';
 import { EditableImage } from '../admin/EditableImage';
 import { useContentValue } from '../../lib/content';
+import { ProjectModules } from '../project-modules/ProjectModules';
 
 interface ProjectDetailTemplateProps {
   projectId: string;
@@ -174,6 +175,8 @@ export function ProjectDetailTemplate({
         >
           {children}
         </motion.div>
+
+        <ProjectModules projectId={projectId} />
       </div>
     </motion.div>
   );
