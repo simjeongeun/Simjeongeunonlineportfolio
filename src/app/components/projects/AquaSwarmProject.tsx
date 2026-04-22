@@ -29,6 +29,7 @@ export function AquaSwarmProject() {
 
   return (
     <ProjectDetailTemplate
+      projectId="aquaswarm"
       title="AquaSwarm"
       subtitle="모듈형 해양 미세플라스틱 포집 솔루션"
       category="Startup Project"

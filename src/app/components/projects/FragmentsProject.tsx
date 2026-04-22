@@ -29,6 +29,7 @@ export function FragmentsProject() {
 
   return (
     <ProjectDetailTemplate
+      projectId="fragments"
       title="Fragments of Light, Movements of Emotion"
       subtitle="빛의 조각과 감정의 흐름 주제의 호텔 리디자인"
       category="Design Project"

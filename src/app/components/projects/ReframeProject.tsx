@@ -29,6 +29,7 @@ export function ReframeProject() {
 
   return (
     <ProjectDetailTemplate
+      projectId="reframe"
       title="RE:FRAME"
       subtitle="삶의 변화에 맞춰 해체하고 조립하는 반응형 가구"
       category="Design Project"

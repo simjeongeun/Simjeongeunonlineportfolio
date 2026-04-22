@@ -27,6 +27,7 @@ export function DynamicModularProject() {
 
   return (
     <ProjectDetailTemplate
+      projectId="dynamic-modular"
       title="Dynamic Modular Bio-Incubation Center"
       subtitle="다이나믹 모듈러 바이오 인큐베이션 센터"
       category="Design Project"

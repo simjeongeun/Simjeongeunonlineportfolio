@@ -29,6 +29,7 @@ export function OsullocProject() {
 
   return (
     <ProjectDetailTemplate
+      projectId="osulloc"
       title="Green Visuals & Experiential Branding at Osulloc"
       subtitle="오설록의 친환경 비주얼 및 체험형 브랜딩, 소비자 주의력에 대한 시선 추적 연구"
       category="Design Project"

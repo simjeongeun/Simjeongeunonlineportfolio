@@ -2,8 +2,12 @@ import { motion } from 'motion/react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { ReactNode } from 'react';
+import { EditableText } from '../admin/EditableText';
+import { EditableImage } from '../admin/EditableImage';
+import { useContentValue } from '../../lib/content';
 
 interface ProjectDetailTemplateProps {
+  projectId: string;
   title: string;
   subtitle: string;
   category: string;
@@ -16,17 +20,17 @@ interface ProjectDetailTemplateProps {
 }
 
 export function ProjectDetailTemplate({
+  projectId,
   title,
   subtitle,
   category,
-  year,
-  location,
-  area,
   description,
   heroImage,
   children,
 }: ProjectDetailTemplateProps) {
   const navigate = useNavigate();
+  const k = (field: string) => `projects.${projectId}.${field}`;
+  const effectiveHero = useContentValue(k('hero.image'), heroImage ?? '');
 
   return (
     <motion.div
@@ -42,9 +46,9 @@ export function ProjectDetailTemplate({
           onClick={() => navigate('/')}
           className="group flex items-center gap-2 md:gap-3 px-4 md:px-6 py-2 md:py-3 bg-white/80 backdrop-blur-sm border border-[#EEEEEE] rounded-full hover:bg-[#F9F9F9] transition-all duration-300 cursor-pointer"
         >
-          <ArrowLeft 
-            className="transition-transform duration-300 group-hover:-translate-x-1" 
-            size={18} 
+          <ArrowLeft
+            className="transition-transform duration-300 group-hover:-translate-x-1"
+            size={18}
           />
           <span
             className="hidden sm:inline"
@@ -61,7 +65,7 @@ export function ProjectDetailTemplate({
       </div>
 
       {/* Hero Image + Title */}
-      {heroImage && (
+      {effectiveHero && (
         <motion.div
           className="w-full"
           initial={{ opacity: 0 }}
@@ -69,23 +73,26 @@ export function ProjectDetailTemplate({
           transition={{ duration: 0.8, delay: 0.1 }}
         >
           <div className="w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden relative">
-            <img
-              src={heroImage}
+            <EditableImage
+              contentKey={k('hero.image')}
+              defaultSrc={heroImage ?? ''}
               alt={title}
               className="w-full h-full object-cover"
+              folder={`portfolio/${projectId}`}
             />
-            <div className="absolute bottom-6 left-4">
-              <h1
-                className="text-white text-[22px] sm:text-[28px] md:text-[36px] lg:text-[42px] text-left"
+            <div className="absolute bottom-6 left-4 pointer-events-none">
+              <EditableText
+                contentKey={k('title')}
+                defaultValue={title}
+                as="h1"
+                className="text-white text-[22px] sm:text-[28px] md:text-[36px] lg:text-[42px] text-left pointer-events-auto"
                 style={{
                   fontFamily: 'Inter, Pretendard, sans-serif',
                   fontWeight: 700,
                   letterSpacing: '0.01em',
                   textShadow: '0 2px 8px rgba(0,0,0,0.4)',
                 }}
-              >
-                {title}
-              </h1>
+              />
             </div>
           </div>
         </motion.div>
@@ -100,7 +107,10 @@ export function ProjectDetailTemplate({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
         >
-          <p
+          <EditableText
+            contentKey={k('category')}
+            defaultValue={category}
+            as="p"
             className="text-[#999999] mb-4"
             style={{
               fontFamily: 'Inter, Pretendard, sans-serif',
@@ -109,52 +119,51 @@ export function ProjectDetailTemplate({
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
             }}
-          >
-            {category}
-          </p>
+          />
 
-          {!heroImage && (
-            <h1
+          {!effectiveHero && (
+            <EditableText
+              contentKey={k('title')}
+              defaultValue={title}
+              as="h1"
               className="text-[#1A1A1A] mb-4 text-[28px] sm:text-[36px] md:text-[48px] lg:text-[56px]"
               style={{
                 fontFamily: 'Inter, Pretendard, sans-serif',
                 fontWeight: 700,
                 letterSpacing: '0.01em',
               }}
-            >
-              {title}
-            </h1>
+            />
           )}
 
-          <p
+          <EditableText
+            contentKey={k('subtitle')}
+            defaultValue={subtitle}
+            as="p"
             className="text-[#666666] mb-12 text-[16px] md:text-[20px]"
             style={{
               fontFamily: 'Inter, Pretendard, sans-serif',
               fontWeight: 300,
               letterSpacing: '0.02em',
             }}
-          >
-            {subtitle}
-          </p>
+          />
 
-          {/* Project Info */}
-          {/* Description */}
-          {description && (
-            <div className="mt-12 max-w-3xl">
-              <p
-                className="text-[#1A1A1A] leading-relaxed"
-                style={{
-                  fontFamily: 'Inter, Pretendard, sans-serif',
-                  fontWeight: 300,
-                  fontSize: '18px',
-                  letterSpacing: '0.01em',
-                  lineHeight: '1.8',
-                }}
-              >
-                {description}
-              </p>
-            </div>
-          )}
+          <div className="mt-12 max-w-3xl">
+            <EditableText
+              contentKey={k('description')}
+              defaultValue={description ?? ''}
+              as="div"
+              multiline
+              className="text-[#1A1A1A] leading-relaxed"
+              style={{
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontWeight: 300,
+                fontSize: '18px',
+                letterSpacing: '0.01em',
+                lineHeight: '1.8',
+                whiteSpace: 'pre-line',
+              }}
+            />
+          </div>
         </motion.div>
 
         {/* Custom Content */}
