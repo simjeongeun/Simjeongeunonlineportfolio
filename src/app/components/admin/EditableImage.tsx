@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ChevronDown, Check, Upload, Trash2, Ruler } from 'lucide-react';
+import { Check, Upload, Trash2 } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useContent } from '../../lib/content';
 import { uploadToCloudinary } from '../../lib/cloudinary-upload';
@@ -13,15 +13,15 @@ type EditableImageProps = {
   folder?: string;
 };
 
-const ASPECT_OPTIONS: { key: string; label: string; value: string | undefined }[] = [
-  { key: 'auto', label: '자동 / 기본', value: undefined },
-  { key: '1-1', label: '1:1 (정사각)', value: '1 / 1' },
-  { key: '4-3', label: '4:3', value: '4 / 3' },
-  { key: '3-2', label: '3:2', value: '3 / 2' },
-  { key: '16-9', label: '16:9 (와이드)', value: '16 / 9' },
-  { key: '21-9', label: '21:9 (파노라마)', value: '21 / 9' },
-  { key: '3-4', label: '3:4 (세로)', value: '3 / 4' },
-  { key: '9-16', label: '9:16 (폰 세로)', value: '9 / 16' },
+const ASPECT_PRESETS: { label: string; value: string | undefined }[] = [
+  { label: 'Auto', value: undefined },
+  { label: '1:1', value: '1 / 1' },
+  { label: '4:3', value: '4 / 3' },
+  { label: '3:2', value: '3 / 2' },
+  { label: '16:9', value: '16 / 9' },
+  { label: '21:9', value: '21 / 9' },
+  { label: '3:4', value: '3 / 4' },
+  { label: '9:16', value: '9 / 16' },
 ];
 
 function extractObjectFit(className?: string): CSSProperties['objectFit'] {
@@ -50,6 +50,21 @@ function extractObjectPosition(className?: string): string | undefined {
   return undefined;
 }
 
+function normalizeAspect(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // Accept formats: "16:9", "16/9", "16 9", "1.77"
+  const colonOrSlash = trimmed.match(/^(\d+(?:\.\d+)?)\s*[:\/\s]\s*(\d+(?:\.\d+)?)$/);
+  if (colonOrSlash) {
+    const a = parseFloat(colonOrSlash[1]);
+    const b = parseFloat(colonOrSlash[2]);
+    if (a > 0 && b > 0) return `${a} / ${b}`;
+  }
+  const single = parseFloat(trimmed);
+  if (!isNaN(single) && single > 0) return `${single} / 1`;
+  return null;
+}
+
 export function EditableImage({
   contentKey,
   defaultSrc,
@@ -63,20 +78,21 @@ export function EditableImage({
   const current = get(contentKey, defaultSrc);
   const storedAspect = get(`${contentKey}.aspect`, '');
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [aspectMenuOpen, setAspectMenuOpen] = useState(false);
-  const aspectMenuRef = useRef<HTMLDivElement | null>(null);
+  const [customInput, setCustomInput] = useState('');
+  const [customError, setCustomError] = useState<string | null>(null);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
-    if (!aspectMenuOpen) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (aspectMenuRef.current && !aspectMenuRef.current.contains(e.target as Node)) {
-        setAspectMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [aspectMenuOpen]);
+    setDims(null);
+    setCustomError(null);
+  }, [current]);
+
+  const handleImgLoad = () => {
+    const img = imgRef.current;
+    if (img) setDims({ w: img.naturalWidth, h: img.naturalHeight });
+  };
 
   const pickFile = () => fileRef.current?.click();
 
@@ -87,6 +103,7 @@ export function EditableImage({
     try {
       const result = await uploadToCloudinary(file, { folder });
       await set(contentKey, result.secureUrl);
+      setDims({ w: result.width, h: result.height });
     } catch (err) {
       console.error('[EditableImage] upload failed', err);
       alert('이미지 업로드 실패: ' + (err instanceof Error ? err.message : String(err)));
@@ -97,18 +114,34 @@ export function EditableImage({
   };
 
   const handleDelete = async () => {
-    if (!confirm('이미지를 제거할까요? (Cloudinary에 업로드된 원본은 남아있고 이 자리에서만 치워집니다.)')) return;
+    if (!confirm('이미지를 제거할까요? (Cloudinary 원본은 남아있고 이 자리에서만 치워집니다.)')) return;
     try {
       await set(contentKey, '');
+      await set(`${contentKey}.aspect`, '');
     } catch (err) {
       alert('이미지 제거 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
   const pickAspect = async (value: string | undefined) => {
-    setAspectMenuOpen(false);
     try {
       await set(`${contentKey}.aspect`, value ?? '');
+      setCustomInput('');
+      setCustomError(null);
+    } catch (err) {
+      alert('비율 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const applyCustomAspect = async () => {
+    const normalized = normalizeAspect(customInput);
+    if (!normalized) {
+      setCustomError('비율 형식을 확인해주세요 (예: 16:9, 4/3, 1.77)');
+      return;
+    }
+    setCustomError(null);
+    try {
+      await set(`${contentKey}.aspect`, normalized);
     } catch (err) {
       alert('비율 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -116,152 +149,188 @@ export function EditableImage({
 
   const hasImage = current.length > 0;
   const aspectOverride = storedAspect.length > 0 ? storedAspect : undefined;
-  const currentAspectKey = ASPECT_OPTIONS.find((o) => (o.value ?? '') === (aspectOverride ?? ''))?.key ?? 'auto';
-  const currentAspectLabel =
-    ASPECT_OPTIONS.find((o) => o.key === currentAspectKey)?.label ?? '자동 / 기본';
 
-  const mergedStyle: CSSProperties = {
+  const matchingPreset = ASPECT_PRESETS.find((p) => (p.value ?? '') === (aspectOverride ?? ''));
+  const isCustom = !!aspectOverride && !matchingPreset;
+
+  const imageStyle: CSSProperties = {
     ...style,
     ...(aspectOverride ? { aspectRatio: aspectOverride } : {}),
   };
 
   if (!isAdmin) {
     if (!hasImage) return null;
-    return <img src={current} alt={alt} className={className} style={mergedStyle} />;
+    return <img src={current} alt={alt} className={className} style={imageStyle} />;
   }
 
   const objectFit = extractObjectFit(className);
   const objectPosition = extractObjectPosition(className);
 
+  // The wrapper matches the original className/style so it lines up with
+  // adjacent text; the status bar lives in a sibling block below so it
+  // never offsets the image's horizontal edges.
   return (
-    <div
-      className={className}
-      style={{
-        ...mergedStyle,
-        position: 'relative',
-        outline: '1px dashed rgba(0, 87, 255, 0.4)',
-        outlineOffset: '2px',
-      }}
-    >
-      {hasImage ? (
-        <img
-          src={current}
-          alt={alt}
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'block',
-            objectFit,
-            objectPosition,
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            minHeight: 120,
-            background:
-              'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#999999',
-            fontFamily: 'Inter, Pretendard, sans-serif',
-            fontSize: 13,
-            letterSpacing: '0.05em',
-          }}
-        >
-          이미지 없음 — 아래 버튼으로 업로드
-        </div>
-      )}
-
+    <div className="w-full">
       <div
-        className="absolute bottom-2 right-2 flex items-center gap-1 bg-white/95 backdrop-blur-sm border border-[#E5E5E5] rounded-full px-1.5 py-1 shadow-md"
-        style={{ zIndex: 50 }}
+        className={className}
+        style={{
+          ...imageStyle,
+          position: 'relative',
+          outline: '1px dashed rgba(0, 87, 255, 0.4)',
+          outlineOffset: '2px',
+        }}
+      >
+        {hasImage ? (
+          <img
+            ref={imgRef}
+            src={current}
+            alt={alt}
+            onLoad={handleImgLoad}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              objectFit,
+              objectPosition,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              minHeight: 120,
+              background:
+                'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#999999',
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontSize: 13,
+              letterSpacing: '0.05em',
+            }}
+          >
+            이미지 없음 — 아래 "업로드" 버튼을 누르세요
+          </div>
+        )}
+      </div>
+
+      {/* Status bar — sits below the image, same width, so left/right edges of image align with text */}
+      <div
+        className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-md bg-[#F9FBFF] border border-[#E5ECF5]"
+        style={{ fontFamily: 'Inter, Pretendard, sans-serif', fontSize: 11 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div ref={aspectMenuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setAspectMenuOpen((v) => !v)}
-            className="flex items-center gap-1 px-2 py-1 rounded-full text-[#1A1A1A] hover:bg-[#F0F5FF] hover:text-[#0057FF] transition-colors"
-            style={{
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontSize: 11,
-              fontWeight: 500,
-            }}
-            title="이미지 비율"
-          >
-            <Ruler size={12} />
-            <span>{currentAspectLabel}</span>
-            <ChevronDown size={11} />
-          </button>
-          {aspectMenuOpen && (
-            <div
-              className="absolute bottom-full right-0 mb-2 bg-white border border-[#E5E5E5] rounded-lg shadow-lg overflow-hidden"
-              style={{ zIndex: 60, minWidth: 180 }}
-              role="listbox"
-            >
-              {ASPECT_OPTIONS.map((opt) => {
-                const active = opt.key === currentAspectKey;
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => pickAspect(opt.value)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
-                      active
-                        ? 'bg-[#F0F5FF] text-[#0057FF]'
-                        : 'text-[#1A1A1A] hover:bg-[#F9F9F9]'
-                    }`}
-                    style={{
-                      fontFamily: 'Inter, Pretendard, sans-serif',
-                      fontSize: 12,
-                      fontWeight: active ? 500 : 400,
-                    }}
-                  >
-                    <span>{opt.label}</span>
-                    {active && <Check size={12} />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        <span
+          className="text-[#0057FF]"
+          style={{
+            fontWeight: 500,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          }}
+        >
+          비율
+        </span>
+
+        <div className="flex flex-wrap gap-1">
+          {ASPECT_PRESETS.map((p) => {
+            const active = (p.value ?? '') === (aspectOverride ?? '') && !isCustom;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => pickAspect(p.value)}
+                className={`px-2 py-0.5 rounded-full border transition-colors ${
+                  active
+                    ? 'bg-[#0057FF] text-white border-[#0057FF]'
+                    : 'bg-white text-[#1A1A1A] border-[#DDD] hover:border-[#0057FF] hover:text-[#0057FF]'
+                }`}
+                style={{ fontSize: 11, fontWeight: active ? 500 : 400 }}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
 
-        <span className="w-px h-4 bg-[#EEEEEE]" />
+        <span className="w-px h-4 bg-[#DCE4EE]" />
 
-        <button
-          type="button"
-          onClick={pickFile}
-          disabled={uploading}
-          className="flex items-center gap-1 px-2 py-1 rounded-full text-white transition-colors"
-          style={{
-            background: '#0057FF',
-            fontFamily: 'Inter, Pretendard, sans-serif',
-            fontSize: 11,
-            fontWeight: 500,
-            cursor: uploading ? 'wait' : 'pointer',
-            opacity: uploading ? 0.7 : 1,
-          }}
-          title="이미지 업로드 / 교체"
-        >
-          <Upload size={12} />
-          <span>{uploading ? '업로드 중…' : hasImage ? '교체' : '업로드'}</span>
-        </button>
-
-        {hasImage && (
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            placeholder="16:9"
+            value={customInput}
+            onChange={(e) => {
+              setCustomInput(e.target.value);
+              setCustomError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') applyCustomAspect();
+            }}
+            className="w-16 px-2 py-0.5 border border-[#DDD] rounded text-[#1A1A1A] outline-none focus:border-[#0057FF]"
+            style={{ fontSize: 11 }}
+          />
           <button
             type="button"
-            onClick={handleDelete}
-            disabled={uploading}
-            className="flex items-center px-2 py-1 rounded-full text-[#999999] hover:text-[#D00] hover:bg-[#FFF0F0] transition-colors"
-            title="이미지 제거"
+            onClick={applyCustomAspect}
+            className="px-2 py-0.5 rounded border border-[#DDD] text-[#1A1A1A] hover:border-[#0057FF] hover:text-[#0057FF] transition-colors"
+            style={{ fontSize: 11 }}
           >
-            <Trash2 size={12} />
+            적용
           </button>
+          {isCustom && (
+            <span className="text-[#0057FF] ml-1" style={{ fontSize: 11 }}>
+              <Check size={12} className="inline-block mr-0.5" />
+              {aspectOverride}
+            </span>
+          )}
+        </div>
+        {customError && (
+          <span className="text-[#D00]" style={{ fontSize: 11 }}>
+            {customError}
+          </span>
         )}
+
+        <span className="w-px h-4 bg-[#DCE4EE]" />
+
+        <span className="text-[#666]">
+          원본 크기: {dims ? `${dims.w} × ${dims.h} px` : hasImage ? '…' : '없음'}
+        </span>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={pickFile}
+            disabled={uploading}
+            className="flex items-center gap-1 px-3 py-1 rounded-full text-white transition-colors"
+            style={{
+              background: '#0057FF',
+              fontSize: 11,
+              fontWeight: 500,
+              cursor: uploading ? 'wait' : 'pointer',
+              opacity: uploading ? 0.7 : 1,
+            }}
+            title="이미지 업로드 / 교체"
+          >
+            <Upload size={12} />
+            <span>{uploading ? '업로드 중…' : hasImage ? '교체' : '업로드'}</span>
+          </button>
+
+          {hasImage && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={uploading}
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[#999] hover:text-[#D00] hover:bg-[#FFF0F0] transition-colors"
+              title="이미지 제거"
+              style={{ fontSize: 11 }}
+            >
+              <Trash2 size={12} />
+              <span>삭제</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <input
