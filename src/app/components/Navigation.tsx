@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Plus } from 'lucide-react';
 import { EditableText } from './admin/EditableText';
+import { useAuth } from '../lib/auth';
+import { useNav } from '../lib/nav';
 
 interface NavigationProps {
   activeSection?: string;
 }
 
 export function Navigation({ activeSection = 'work' }: NavigationProps) {
-  const [scrolled, setScrolled] = useState(false);
+  const [, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAdmin } = useAuth();
+  const { items: menuItems, addItem, removeItem } = useNav();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -26,19 +30,33 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
       const offsetTop = element.offsetTop - 80;
       window.scrollTo({
         top: offsetTop,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
     }
   };
 
-  const menuItems = [
-    { label: 'Work', id: 'work' },
-    { label: 'About', id: 'about' },
-    { label: 'Contact', id: 'contact' }
-  ];
+  const handleAdd = async () => {
+    const label = window.prompt('새 메뉴 이름을 입력하세요', 'New Section');
+    if (label === null) return;
+    try {
+      await addItem(label);
+    } catch (err) {
+      alert('메뉴 추가 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleRemove = async (id: string, label: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`"${label}" 메뉴를 삭제할까요?`)) return;
+    try {
+      await removeItem(id);
+    } catch (err) {
+      alert('메뉴 삭제 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
 
   return (
-    <nav 
+    <nav
       className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
       style={{
         height: '80px',
@@ -48,49 +66,72 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
         borderBottom: '1px solid #EEEEEE',
       }}
     >
-      <div 
-        className="h-full flex items-center justify-between px-6 sm:px-10 md:px-16 lg:px-[120px]"
-      >
-        {/* Left Side - Name */}
-        <div>
-        </div>
+      <div className="h-full flex items-center justify-between px-6 sm:px-10 md:px-16 lg:px-[120px]">
+        <div></div>
 
         {/* Desktop Menu */}
-        <div className="hidden md:flex items-center gap-12">
+        <div className="hidden md:flex items-center gap-10 lg:gap-12">
           {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => scrollToSection(item.id)}
-              className="relative group"
-            >
-              <EditableText
-                contentKey={`nav.${item.id}`}
-                defaultValue={item.label}
-                as="span"
-                className="transition-colors duration-200 group-hover:text-[#0057FF]"
-                style={{
-                  fontFamily: 'Inter, Pretendard, sans-serif',
-                  fontWeight: 500,
-                  fontSize: '15px',
-                  color: activeSection === item.id ? '#0057FF' : '#1A1A1A',
-                }}
-              />
-              {activeSection === item.id && (
-                <span
-                  className="absolute -bottom-1 left-1/2 transform -translate-x-1/2"
+            <div key={item.id} className="relative group/item flex items-center gap-1">
+              <button
+                onClick={() => scrollToSection(item.id)}
+                className="relative group"
+              >
+                <EditableText
+                  contentKey={`section.${item.id}.heading`}
+                  defaultValue={item.label}
+                  as="span"
+                  className="transition-colors duration-200 group-hover:text-[#0057FF]"
                   style={{
-                    width: '4px',
-                    height: '4px',
-                    borderRadius: '50%',
-                    backgroundColor: '#0057FF',
+                    fontFamily: 'Inter, Pretendard, sans-serif',
+                    fontWeight: 500,
+                    fontSize: '15px',
+                    color: activeSection === item.id ? '#0057FF' : '#1A1A1A',
                   }}
                 />
+                {activeSection === item.id && (
+                  <span
+                    className="absolute -bottom-1 left-1/2 transform -translate-x-1/2"
+                    style={{
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      backgroundColor: '#0057FF',
+                    }}
+                  />
+                )}
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={(e) => handleRemove(item.id, item.label, e)}
+                  className="opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 p-1 text-[#CCCCCC] hover:text-[#D00]"
+                  aria-label={`${item.label} 삭제`}
+                >
+                  <X size={12} />
+                </button>
               )}
-            </button>
+            </div>
           ))}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleAdd}
+              className="flex items-center gap-1 px-3 py-1 text-[#999999] border border-dashed border-[#DDDDDD] rounded-full hover:text-[#0057FF] hover:border-[#0057FF] transition-colors duration-200"
+              style={{
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontWeight: 400,
+                fontSize: '12px',
+                letterSpacing: '0.03em',
+              }}
+              aria-label="메뉴 추가"
+            >
+              <Plus size={12} />
+              <span>추가</span>
+            </button>
+          )}
         </div>
 
-        {/* Mobile Hamburger */}
         <button
           className="md:hidden text-[#1A1A1A] p-2"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -101,30 +142,51 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div
-          className="md:hidden absolute top-[80px] left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#EEEEEE]"
-        >
+        <div className="md:hidden absolute top-[80px] left-0 right-0 bg-white/95 backdrop-blur-md border-b border-[#EEEEEE]">
           <div className="flex flex-col items-center py-6 gap-6">
             {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => scrollToSection(item.id)}
-                className="relative"
-              >
-                <EditableText
-                  contentKey={`nav.${item.id}`}
-                  defaultValue={item.label}
-                  as="span"
-                  className="transition-colors duration-200"
-                  style={{
-                    fontFamily: 'Inter, Pretendard, sans-serif',
-                    fontWeight: 500,
-                    fontSize: '16px',
-                    color: activeSection === item.id ? '#0057FF' : '#1A1A1A',
-                  }}
-                />
-              </button>
+              <div key={item.id} className="flex items-center gap-2">
+                <button onClick={() => scrollToSection(item.id)} className="relative">
+                  <EditableText
+                    contentKey={`section.${item.id}.heading`}
+                    defaultValue={item.label}
+                    as="span"
+                    className="transition-colors duration-200"
+                    style={{
+                      fontFamily: 'Inter, Pretendard, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '16px',
+                      color: activeSection === item.id ? '#0057FF' : '#1A1A1A',
+                    }}
+                  />
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemove(item.id, item.label, e)}
+                    className="p-1 text-[#CCCCCC] hover:text-[#D00]"
+                    aria-label={`${item.label} 삭제`}
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
             ))}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleAdd}
+                className="flex items-center gap-1 px-3 py-1 text-[#999999] border border-dashed border-[#DDDDDD] rounded-full hover:text-[#0057FF] hover:border-[#0057FF] transition-colors duration-200"
+                style={{
+                  fontFamily: 'Inter, Pretendard, sans-serif',
+                  fontWeight: 400,
+                  fontSize: '13px',
+                }}
+              >
+                <Plus size={14} />
+                <span>메뉴 추가</span>
+              </button>
+            )}
           </div>
         </div>
       )}
