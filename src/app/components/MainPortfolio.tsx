@@ -4,13 +4,23 @@ import { motion } from 'motion/react';
 import { ArrowRight, Mail, Phone, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../lib/auth';
+import { useContentValue } from '../lib/content';
+import { EditableText } from './admin/EditableText';
+import { AdminLoginModal } from './admin/AdminLoginModal';
+
+const DEFAULT_EMAIL = 'simjeongeun@example.com';
+const DEFAULT_PHONE = '+82 10-8432-5901';
 
 export function MainPortfolio() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('work');
-  const [showAdminLogin, setShowAdminLogin] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const { isAdmin, signOut } = useAuth();
+
+  const email = useContentValue('contact.email', DEFAULT_EMAIL);
+  const phone = useContentValue('contact.phone', DEFAULT_PHONE);
+  const telHref = `tel:${phone.replace(/[^\d+]/g, '')}`;
 
   const projects = [
     {
@@ -98,9 +108,12 @@ export function MainPortfolio() {
               letterSpacing: '0.08em',
             }}
           >
-            <span className="block text-[48px] sm:text-[64px] md:text-[80px] lg:text-[112px]">
-              PORTFOLIO
-            </span>
+            <EditableText
+              contentKey="hero.title"
+              defaultValue="PORTFOLIO"
+              as="span"
+              className="block text-[48px] sm:text-[64px] md:text-[80px] lg:text-[112px]"
+            />
           </p>
         </motion.div>
 
@@ -111,18 +124,19 @@ export function MainPortfolio() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
         >
-          <h1 
+          <EditableText
+            contentKey="hero.name"
+            defaultValue="SIM JEONG EUN"
+            as="h1"
             className="text-[#1A1A1A] whitespace-nowrap"
-            style={{ 
+            style={{
               fontFamily: 'Inter, Pretendard, sans-serif',
               fontWeight: 300,
               fontSize: '24px',
               letterSpacing: '0.2em',
               lineHeight: 1,
             }}
-          >
-            SIM JEONG EUN
-          </h1>
+          />
         </motion.div>
       </section>
 
@@ -187,7 +201,7 @@ export function MainPortfolio() {
             transition={{ duration: 0.8, delay: 0.2 }}
             viewport={{ once: true }}
           >
-            <p
+            <div
               className="text-[#1A1A1A] leading-relaxed"
               style={{
                 fontFamily: 'Inter, Pretendard, sans-serif',
@@ -196,12 +210,21 @@ export function MainPortfolio() {
                 lineHeight: '1.8',
               }}
             >
-              <span className="block" style={{ fontWeight: 600, fontSize: '24px', marginBottom: '16px' }}>
-                심정은 / Sim Jeong Eun
-              </span>
-              아이디어를 현실로 구현하고, 공간으로 설계해 설득하는 디자이너입니다.<br /><br />
-              공간디자인과 창업 경험을 바탕으로 기획, 실행, 협업의 전 과정을 다루며 사용자의 경험을 중심으로 한 공간을 만들어갑니다.
-            </p>
+              <EditableText
+                contentKey="about.name"
+                defaultValue="심정은 / Sim Jeong Eun"
+                as="div"
+                className="block"
+                style={{ fontWeight: 600, fontSize: '24px', marginBottom: '16px' }}
+              />
+              <EditableText
+                contentKey="about.bio"
+                defaultValue="아이디어를 현실로 구현하고, 공간으로 설계해 설득하는 디자이너입니다.\n\n공간디자인과 창업 경험을 바탕으로 기획, 실행, 협업의 전 과정을 다루며 사용자의 경험을 중심으로 한 공간을 만들어갑니다."
+                as="div"
+                multiline
+                style={{ whiteSpace: 'pre-line' }}
+              />
+            </div>
 
             <div className="pt-8">
               <h3
@@ -218,26 +241,28 @@ export function MainPortfolio() {
               
               <div className="space-y-4">
                 <div className="border-l-2 border-[#0057FF] pl-6 py-2">
-                  <p
+                  <EditableText
+                    contentKey="about.experience.year"
+                    defaultValue="2023 - 2026"
+                    as="p"
                     className="text-[#666666]"
                     style={{
                       fontFamily: 'Inter, Pretendard, sans-serif',
                       fontWeight: 500,
                       fontSize: '14px',
                     }}
-                  >
-                    2023 - 2026
-                  </p>
-                  <p
+                  />
+                  <EditableText
+                    contentKey="about.experience.title"
+                    defaultValue="Space Design Projects & Innovations"
+                    as="p"
                     className="text-[#1A1A1A]"
                     style={{
                       fontFamily: 'Inter, Pretendard, sans-serif',
                       fontWeight: 500,
                       fontSize: '16px',
                     }}
-                  >
-                    Space Design Projects & Innovations
-                  </p>
+                  />
                 </div>
               </div>
             </div>
@@ -274,7 +299,7 @@ export function MainPortfolio() {
             <div className="flex items-center gap-4">
               <Mail size={24} className="text-[#0057FF]" />
               <a
-                href="mailto:simjeongeun@example.com"
+                href={`mailto:${email}`}
                 className="text-[#1A1A1A] hover:text-[#0057FF] transition-colors duration-200"
                 style={{
                   fontFamily: 'Inter, Pretendard, sans-serif',
@@ -282,14 +307,18 @@ export function MainPortfolio() {
                   fontSize: '18px',
                 }}
               >
-                simjeongeun@example.com
+                <EditableText
+                  contentKey="contact.email"
+                  defaultValue={DEFAULT_EMAIL}
+                  as="span"
+                />
               </a>
             </div>
 
             <div className="flex items-center gap-4">
               <Phone size={24} className="text-[#0057FF]" />
               <a
-                href="tel:+821012345678"
+                href={telHref}
                 className="text-[#1A1A1A] hover:text-[#0057FF] transition-colors duration-200"
                 style={{
                   fontFamily: 'Inter, Pretendard, sans-serif',
@@ -297,7 +326,11 @@ export function MainPortfolio() {
                   fontSize: '18px',
                 }}
               >
-                +82 10-1234-5678
+                <EditableText
+                  contentKey="contact.phone"
+                  defaultValue={DEFAULT_PHONE}
+                  as="span"
+                />
               </a>
             </div>
           </motion.div>
@@ -325,7 +358,7 @@ export function MainPortfolio() {
             <div className="flex justify-center mt-4">
               {isAdmin ? (
                 <button
-                  onClick={() => setIsAdmin(false)}
+                  onClick={() => { void signOut(); }}
                   className="flex items-center gap-2 px-4 py-2 text-[#0057FF] border border-[#0057FF] rounded-full hover:bg-[#0057FF] hover:text-white transition-all duration-200"
                   style={{
                     fontFamily: 'Inter, Pretendard, sans-serif',
@@ -338,81 +371,25 @@ export function MainPortfolio() {
                   관리자 모드 해제
                 </button>
               ) : (
-                <>
-                  {!showAdminLogin ? (
-                    <button
-                      onClick={() => setShowAdminLogin(true)}
-                      className="text-[#CCCCCC] hover:text-[#999999] transition-colors duration-200"
-                      style={{
-                        fontFamily: 'Inter, Pretendard, sans-serif',
-                        fontWeight: 300,
-                        fontSize: '12px',
-                      }}
-                    >
-                      <Settings size={14} />
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="password"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            if (adminPassword === '0000') {
-                              setIsAdmin(true);
-                              setShowAdminLogin(false);
-                              setAdminPassword('');
-                            } else {
-                              setAdminPassword('');
-                            }
-                          }
-                          if (e.key === 'Escape') {
-                            setShowAdminLogin(false);
-                            setAdminPassword('');
-                          }
-                        }}
-                        placeholder="비밀번호"
-                        className="w-32 px-3 py-1.5 border border-[#DDDDDD] rounded-full text-center outline-none focus:border-[#0057FF] transition-colors"
-                        style={{
-                          fontFamily: 'Inter, Pretendard, sans-serif',
-                          fontSize: '12px',
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => {
-                          if (adminPassword === '0000') {
-                            setIsAdmin(true);
-                            setShowAdminLogin(false);
-                            setAdminPassword('');
-                          } else {
-                            setAdminPassword('');
-                          }
-                        }}
-                        className="px-3 py-1.5 bg-[#1A1A1A] text-white rounded-full hover:bg-[#0057FF] transition-colors"
-                        style={{
-                          fontFamily: 'Inter, Pretendard, sans-serif',
-                          fontSize: '12px',
-                        }}
-                      >
-                        확인
-                      </button>
-                      <button
-                        onClick={() => { setShowAdminLogin(false); setAdminPassword(''); }}
-                        className="text-[#999999] hover:text-[#1A1A1A] transition-colors"
-                        style={{ fontSize: '12px' }}
-                      >
-                        취소
-                      </button>
-                    </div>
-                  )}
-                </>
+                <button
+                  onClick={() => setLoginOpen(true)}
+                  className="text-[#CCCCCC] hover:text-[#999999] transition-colors duration-200"
+                  style={{
+                    fontFamily: 'Inter, Pretendard, sans-serif',
+                    fontWeight: 300,
+                    fontSize: '12px',
+                  }}
+                  aria-label="관리자 로그인"
+                >
+                  <Settings size={14} />
+                </button>
               )}
             </div>
           </motion.div>
         </div>
       </section>
+
+      <AdminLoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
     </div>
   );
 }
