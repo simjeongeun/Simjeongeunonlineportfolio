@@ -44,6 +44,7 @@ export type UseProjectModulesResult = {
   addModule: (type: ModuleType) => Promise<ProjectModule>;
   removeModule: (id: string) => Promise<void>;
   reorderModules: (fromIdx: number, toIdx: number) => Promise<void>;
+  changeModuleType: (id: string, newType: ModuleType) => Promise<void>;
 };
 
 const COLLECTION = 'content';
@@ -110,6 +111,11 @@ export function useProjectModules(projectId: string): UseProjectModulesResult {
         const next = [...modules];
         const [moved] = next.splice(fromIdx, 1);
         next.splice(toIdx, 0, moved);
+        setModules(next);
+        await writeRemote(next);
+      },
+      changeModuleType: async (id, newType) => {
+        const next = modules.map((m) => (m.id === id ? { ...m, type: newType } : m));
         setModules(next);
         await writeRemote(next);
       },

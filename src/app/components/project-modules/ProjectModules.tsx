@@ -49,7 +49,8 @@ const PALETTE: ModuleType[] = [
 
 export function ProjectModules({ projectId }: ProjectModulesProps) {
   const { isAdmin } = useAuth();
-  const { modules, addModule, removeModule, reorderModules } = useProjectModules(projectId);
+  const { modules, addModule, removeModule, reorderModules, changeModuleType } =
+    useProjectModules(projectId);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -128,6 +129,11 @@ export function ProjectModules({ projectId }: ProjectModulesProps) {
             onMoveUp={() => handleMove(index, -1)}
             onMoveDown={() => handleMove(index, 1)}
             onRemove={() => handleRemove(module.id)}
+            onChangeType={(t) =>
+              changeModuleType(module.id, t).catch((err) =>
+                alert('타입 변경 실패: ' + (err instanceof Error ? err.message : String(err)))
+              )
+            }
           >
             {moduleContent}
           </SortableModule>
