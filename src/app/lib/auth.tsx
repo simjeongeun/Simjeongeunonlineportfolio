@@ -12,7 +12,7 @@ import {
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from './firebase';
+import { getFirebaseAuth, getMissingFirebaseEnvKeys, isFirebaseConfigured } from './firebase';
 
 type AuthContextValue = {
   user: User | null;
@@ -48,7 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: user !== null,
       signIn: async (email, password) => {
         const auth = getFirebaseAuth();
-        if (!auth) throw new Error('Firebase is not configured.');
+        if (!auth) {
+          const missing = getMissingFirebaseEnvKeys();
+          throw new Error(
+            missing.length > 0
+              ? `Firebase env 누락: ${missing.join(', ')}. Vercel에 VITE_FIREBASE_* 추가 후 캐시 없이 Redeploy 필요.`
+              : 'Firebase 초기화 실패 (원인 불명, 콘솔 확인)'
+          );
+        }
         await signInWithEmailAndPassword(auth, email, password);
       },
       signOut: async () => {
