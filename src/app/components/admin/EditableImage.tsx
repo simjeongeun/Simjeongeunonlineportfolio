@@ -24,7 +24,10 @@ const ASPECT_PRESETS: { label: string; value: string | undefined }[] = [
   { label: '9:16', value: '9 / 16' },
 ];
 
+const MANUAL_KEY = 'manual';
 const DEFAULT_POSITION = '50% 50%';
+const MIN_HEIGHT = 120;
+const MAX_HEIGHT = 2400;
 
 function normalizeAspect(input: string): string | null {
   const trimmed = input.trim();
@@ -67,6 +70,7 @@ export function EditableImage({
   const { get, set } = useContent();
   const current = get(contentKey, defaultSrc);
   const storedAspect = get(`${contentKey}.aspect`, '');
+  const storedHeight = get(`${contentKey}.height`, '');
   const storedPosition = get(`${contentKey}.position`, DEFAULT_POSITION);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -76,7 +80,12 @@ export function EditableImage({
   const [customError, setCustomError] = useState<string | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   const [livePosition, setLivePosition] = useState<string | null>(null);
+  const [liveHeight, setLiveHeight] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
+
+  const isManual = storedAspect === MANUAL_KEY;
+  const manualHeight = isManual ? parseInt(storedHeight, 10) || undefined : undefined;
 
   useEffect(() => {
     setDims(null);
@@ -88,10 +97,14 @@ export function EditableImage({
   }, [storedPosition]);
 
   useEffect(() => {
+    setLiveHeight(null);
+  }, [storedHeight]);
+
+  // Position drag (object-position)
+  useEffect(() => {
     if (!dragging) return;
-    const img = imgRef.current;
     const wrapper = wrapperRef.current;
-    if (!img || !wrapper) return;
+    if (!wrapper) return;
     const rect = wrapper.getBoundingClientRect();
     const start = parsePosition(storedPosition);
     const startPointer = { x: 0, y: 0, set: false };
@@ -106,15 +119,12 @@ export function EditableImage({
       }
       const dxPct = ((e.clientX - startPointer.x) / rect.width) * 100;
       const dyPct = ((e.clientY - startPointer.y) / rect.height) * 100;
-      // Dragging right should reveal more of the left side of the image;
-      // object-position X increases as we subtract drag X.
       lastPos = {
         x: clamp(start.x - dxPct, 0, 100),
         y: clamp(start.y - dyPct, 0, 100),
       };
       setLivePosition(`${lastPos.x.toFixed(1)}% ${lastPos.y.toFixed(1)}%`);
     };
-
     const onUp = async () => {
       setDragging(false);
       const finalPos = `${lastPos.x.toFixed(1)}% ${lastPos.y.toFixed(1)}%`;
@@ -126,7 +136,6 @@ export function EditableImage({
         }
       }
     };
-
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
     return () => {
@@ -134,6 +143,35 @@ export function EditableImage({
       window.removeEventListener('pointerup', onUp);
     };
   }, [dragging, storedPosition, contentKey, set]);
+
+  // Height resize (manual mode)
+  useEffect(() => {
+    if (!resizing) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const startTop = wrapper.getBoundingClientRect().top;
+    let latest = manualHeight ?? wrapper.offsetHeight;
+
+    const onMove = (e: PointerEvent) => {
+      const target = e.clientY - startTop;
+      latest = Math.round(clamp(target, MIN_HEIGHT, MAX_HEIGHT));
+      setLiveHeight(latest);
+    };
+    const onUp = async () => {
+      setResizing(false);
+      try {
+        await set(`${contentKey}.height`, `${latest}`);
+      } catch (err) {
+        console.error('[EditableImage] height save failed', err);
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [resizing, manualHeight, contentKey, set]);
 
   const handleImgLoad = () => {
     const img = imgRef.current;
@@ -145,6 +183,13 @@ export function EditableImage({
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     setDragging(true);
+  };
+
+  const handleResizeDown = (e: React.PointerEvent) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing(true);
   };
 
   const pickFile = () => fileRef.current?.click();
@@ -171,6 +216,7 @@ export function EditableImage({
     try {
       await set(contentKey, '');
       await set(`${contentKey}.aspect`, '');
+      await set(`${contentKey}.height`, '');
       await set(`${contentKey}.position`, '');
     } catch (err) {
       alert('이미지 제거 실패: ' + (err instanceof Error ? err.message : String(err)));
@@ -180,10 +226,29 @@ export function EditableImage({
   const pickAspect = async (value: string | undefined) => {
     try {
       await set(`${contentKey}.aspect`, value ?? '');
+      // leaving manual mode clears the manual height
+      if (value !== MANUAL_KEY) {
+        await set(`${contentKey}.height`, '');
+      }
       setCustomInput('');
       setCustomError(null);
     } catch (err) {
       alert('비율 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const pickManual = async () => {
+    // Snapshot the current rendered height so "manual" starts where Auto/preset
+    // left off instead of collapsing to MIN_HEIGHT.
+    const wrapper = wrapperRef.current;
+    const snap = wrapper ? Math.round(clamp(wrapper.offsetHeight, MIN_HEIGHT, MAX_HEIGHT)) : 400;
+    try {
+      await set(`${contentKey}.aspect`, MANUAL_KEY);
+      await set(`${contentKey}.height`, `${snap}`);
+      setCustomInput('');
+      setCustomError(null);
+    } catch (err) {
+      alert('수동 모드 전환 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -196,6 +261,7 @@ export function EditableImage({
     setCustomError(null);
     try {
       await set(`${contentKey}.aspect`, normalized);
+      await set(`${contentKey}.height`, '');
     } catch (err) {
       alert('비율 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -210,17 +276,23 @@ export function EditableImage({
   };
 
   const hasImage = current.length > 0;
-  const aspectOverride = storedAspect.length > 0 ? storedAspect : undefined;
+  const aspectOverride =
+    storedAspect.length > 0 && storedAspect !== MANUAL_KEY ? storedAspect : undefined;
   const matchingPreset = ASPECT_PRESETS.find((p) => (p.value ?? '') === (aspectOverride ?? ''));
   const isCustom = !!aspectOverride && !matchingPreset;
   const effectivePosition = livePosition ?? storedPosition;
   const isRepositioned = storedPosition !== DEFAULT_POSITION && storedPosition !== '';
+  const effectiveHeight = liveHeight ?? manualHeight;
 
   const wrapperStyle: CSSProperties = {
     ...style,
     position: 'relative',
     overflow: 'hidden',
-    ...(aspectOverride ? { aspectRatio: aspectOverride } : {}),
+    ...(isManual
+      ? { height: `${effectiveHeight ?? 400}px`, aspectRatio: 'auto' }
+      : aspectOverride
+      ? { aspectRatio: aspectOverride }
+      : {}),
   };
 
   const fillStyle: CSSProperties = {
@@ -301,6 +373,45 @@ export function EditableImage({
             <span>{dragging ? '위치 조정 중…' : '드래그로 위치 조정'}</span>
           </div>
         )}
+        {isManual && (
+          <div
+            onPointerDown={handleResizeDown}
+            className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
+            style={{
+              height: 10,
+              cursor: 'ns-resize',
+              background: resizing ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
+              transition: 'background 120ms',
+              touchAction: 'none',
+              zIndex: 10,
+            }}
+            title="아래로 드래그해서 높이 조절"
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                width: 32,
+                height: 3,
+                borderRadius: 2,
+                background: resizing ? '#0057FF' : 'rgba(0,87,255,0.6)',
+              }}
+            />
+          </div>
+        )}
+        {isManual && (
+          <div
+            className="absolute top-2 right-2 px-2 py-1 rounded-full pointer-events-none"
+            style={{
+              background: 'rgba(0,87,255,0.9)',
+              color: 'white',
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontSize: 11,
+              fontWeight: 500,
+            }}
+          >
+            {effectiveHeight ?? 400} px
+          </div>
+        )}
       </div>
 
       <div
@@ -321,7 +432,7 @@ export function EditableImage({
 
         <div className="flex flex-wrap gap-1">
           {ASPECT_PRESETS.map((p) => {
-            const active = (p.value ?? '') === (aspectOverride ?? '') && !isCustom;
+            const active = !isManual && (p.value ?? '') === (aspectOverride ?? '') && !isCustom;
             return (
               <button
                 key={p.label}
@@ -338,6 +449,19 @@ export function EditableImage({
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={pickManual}
+            className={`px-2 py-0.5 rounded-full border transition-colors ${
+              isManual
+                ? 'bg-[#0057FF] text-white border-[#0057FF]'
+                : 'bg-white text-[#1A1A1A] border-[#DDD] hover:border-[#0057FF] hover:text-[#0057FF]'
+            }`}
+            style={{ fontSize: 11, fontWeight: isManual ? 500 : 400 }}
+            title="높이를 직접 드래그로 조절"
+          >
+            수동
+          </button>
         </div>
 
         <span className="w-px h-4 bg-[#DCE4EE]" />
