@@ -24,36 +24,9 @@ const ASPECT_PRESETS: { label: string; value: string | undefined }[] = [
   { label: '9:16', value: '9 / 16' },
 ];
 
-function extractObjectFit(className?: string): CSSProperties['objectFit'] {
-  if (!className) return undefined;
-  const m = className.match(/\bobject-(contain|cover|fill|none|scale-down)\b/);
-  return m ? (m[1] as CSSProperties['objectFit']) : undefined;
-}
-
-function extractObjectPosition(className?: string): string | undefined {
-  if (!className) return undefined;
-  const positions = [
-    'left-top',
-    'right-top',
-    'left-bottom',
-    'right-bottom',
-    'top',
-    'bottom',
-    'left',
-    'right',
-    'center',
-  ];
-  for (const p of positions) {
-    const re = new RegExp(`\\bobject-${p}\\b`);
-    if (re.test(className)) return p.replace('-', ' ');
-  }
-  return undefined;
-}
-
 function normalizeAspect(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-  // Accept formats: "16:9", "16/9", "16 9", "1.77"
   const colonOrSlash = trimmed.match(/^(\d+(?:\.\d+)?)\s*[:\/\s]\s*(\d+(?:\.\d+)?)$/);
   if (colonOrSlash) {
     const a = parseFloat(colonOrSlash[1]);
@@ -149,74 +122,62 @@ export function EditableImage({
 
   const hasImage = current.length > 0;
   const aspectOverride = storedAspect.length > 0 ? storedAspect : undefined;
-
   const matchingPreset = ASPECT_PRESETS.find((p) => (p.value ?? '') === (aspectOverride ?? ''));
   const isCustom = !!aspectOverride && !matchingPreset;
 
-  const imageStyle: CSSProperties = {
+  // The image (or placeholder) gets the caller's className + any aspect
+  // override via inline style. That way the *image itself* fills the slot
+  // at the chosen ratio using object-fit: cover — the surrounding layout
+  // tracks the image's edges exactly, not the other way around.
+  const baseStyle: CSSProperties = {
     ...style,
+    display: 'block',
     ...(aspectOverride ? { aspectRatio: aspectOverride } : {}),
   };
 
   if (!isAdmin) {
     if (!hasImage) return null;
-    return <img src={current} alt={alt} className={className} style={imageStyle} />;
+    return <img src={current} alt={alt} className={className} style={baseStyle} />;
   }
 
-  const objectFit = extractObjectFit(className);
-  const objectPosition = extractObjectPosition(className);
+  const adminFrameStyle: CSSProperties = {
+    ...baseStyle,
+    outline: '1px dashed rgba(0, 87, 255, 0.4)',
+    outlineOffset: '2px',
+  };
 
-  // The wrapper matches the original className/style so it lines up with
-  // adjacent text; the status bar lives in a sibling block below so it
-  // never offsets the image's horizontal edges.
   return (
     <div className="w-full">
-      <div
-        className={className}
-        style={{
-          ...imageStyle,
-          position: 'relative',
-          outline: '1px dashed rgba(0, 87, 255, 0.4)',
-          outlineOffset: '2px',
-        }}
-      >
-        {hasImage ? (
-          <img
-            ref={imgRef}
-            src={current}
-            alt={alt}
-            onLoad={handleImgLoad}
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'block',
-              objectFit,
-              objectPosition,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              minHeight: 120,
-              background:
-                'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#999999',
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontSize: 13,
-              letterSpacing: '0.05em',
-            }}
-          >
-            이미지 없음 — 아래 "업로드" 버튼을 누르세요
-          </div>
-        )}
-      </div>
+      {hasImage ? (
+        <img
+          ref={imgRef}
+          src={current}
+          alt={alt}
+          onLoad={handleImgLoad}
+          className={className}
+          style={adminFrameStyle}
+        />
+      ) : (
+        <div
+          className={className}
+          style={{
+            ...adminFrameStyle,
+            background:
+              'repeating-linear-gradient(45deg, #F5F5F5, #F5F5F5 10px, #FAFAFA 10px, #FAFAFA 20px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#999999',
+            fontFamily: 'Inter, Pretendard, sans-serif',
+            fontSize: 13,
+            letterSpacing: '0.05em',
+            minHeight: 120,
+          }}
+        >
+          이미지 없음 — 아래 "업로드" 버튼을 누르세요
+        </div>
+      )}
 
-      {/* Status bar — sits below the image, same width, so left/right edges of image align with text */}
       <div
         className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-md bg-[#F9FBFF] border border-[#E5ECF5]"
         style={{ fontFamily: 'Inter, Pretendard, sans-serif', fontSize: 11 }}
