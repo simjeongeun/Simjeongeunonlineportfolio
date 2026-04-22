@@ -227,7 +227,9 @@ export function EditableImage({
     if (!wrapper) return;
     const startW = wrapper.offsetWidth;
     const startH = wrapper.offsetHeight;
-    const maxW = Math.max(sectionInnerWidth, parentWidth, startW);
+    // Max width = the outer container's width (same width as the status
+    // bar beneath it). That's what "수동" lets the image stretch to.
+    const maxW = Math.max(parentWidth, startW, MIN_WIDTH_PX);
     const pointer = { x: 0, y: 0, set: false };
     const handle = resizing;
     let latestH = startH;
@@ -455,37 +457,24 @@ export function EditableImage({
 
   const adminWrapperStyle: CSSProperties = {
     ...wrapperStyle,
-    width: '100%',
     outline: '1px dashed rgba(0, 87, 255, 0.4)',
     outlineOffset: '2px',
   };
-  if (isManual) {
-    // In manual mode the outer container owns the width, so the inner
-    // image box just fills it. Reset the inner width / negative margins
-    // that wrapperStyle would otherwise set.
-    adminWrapperStyle.width = '100%';
-    adminWrapperStyle.marginLeft = 0;
-    adminWrapperStyle.marginRight = 0;
-  }
-
-  const outerSizingClass = extractSizingClasses(className);
-  const outerStyle: CSSProperties = {};
+  // In manual mode the image frame ignores the className's max-width cap
+  // (like max-w-4xl) so the user can stretch all the way to the outer
+  // container — i.e. the same width as the status bar below. Width is
+  // taken from the stored widthPx (or live drag value), centered with
+  // auto margins so it stays aligned with the rest of the column.
   if (isManual) {
     const w = effectiveWidthPx ?? parentWidth ?? 800;
-    const overflow = parentWidth > 0 ? Math.max(0, (w - parentWidth) / 2) : 0;
-    outerStyle.width = `${w}px`;
-    outerStyle.maxWidth = 'none';
-    if (overflow > 0) {
-      outerStyle.marginLeft = `-${overflow}px`;
-      outerStyle.marginRight = `-${overflow}px`;
-    } else {
-      outerStyle.marginLeft = 'auto';
-      outerStyle.marginRight = 'auto';
-    }
+    adminWrapperStyle.width = `${w}px`;
+    adminWrapperStyle.maxWidth = 'none';
+    adminWrapperStyle.marginLeft = 'auto';
+    adminWrapperStyle.marginRight = 'auto';
   }
 
   return (
-    <div className={outerSizingClass || 'w-full'} style={outerStyle}>
+    <div className="w-full">
       <div ref={wrapperRef} className={className} style={adminWrapperStyle}>
         {hasImage ? (
           <img
