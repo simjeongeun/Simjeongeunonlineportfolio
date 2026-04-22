@@ -78,7 +78,7 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
                 className="relative group"
               >
                 <EditableText
-                  contentKey={`nav.${item.id}`}
+                  contentKey={`section.${item.id}.heading`}
                   defaultValue={item.label}
                   as="span"
                   className="transition-colors duration-200 group-hover:text-[#0057FF]"
@@ -148,7 +148,7 @@ export function Navigation({ activeSection = 'work' }: NavigationProps) {
               <div key={item.id} className="flex items-center gap-2">
                 <button onClick={() => scrollToSection(item.id)} className="relative">
                   <EditableText
-                    contentKey={`nav.${item.id}`}
+                    contentKey={`section.${item.id}.heading`}
                     defaultValue={item.label}
                     as="span"
                     className="transition-colors duration-200"

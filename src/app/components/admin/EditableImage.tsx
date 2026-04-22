@@ -12,6 +12,32 @@ type EditableImageProps = {
   folder?: string;
 };
 
+function extractObjectFit(className?: string): CSSProperties['objectFit'] {
+  if (!className) return undefined;
+  const m = className.match(/\bobject-(contain|cover|fill|none|scale-down)\b/);
+  return m ? (m[1] as CSSProperties['objectFit']) : undefined;
+}
+
+function extractObjectPosition(className?: string): string | undefined {
+  if (!className) return undefined;
+  const positions = [
+    'left-top',
+    'right-top',
+    'left-bottom',
+    'right-bottom',
+    'top',
+    'bottom',
+    'left',
+    'right',
+    'center',
+  ];
+  for (const p of positions) {
+    const re = new RegExp(`\\bobject-${p}\\b`);
+    if (re.test(className)) return p.replace('-', ' ');
+  }
+  return undefined;
+}
+
 export function EditableImage({
   contentKey,
   defaultSrc,
@@ -48,16 +74,28 @@ export function EditableImage({
     return <img src={current} alt={alt} className={className} style={style} />;
   }
 
+  const objectFit = extractObjectFit(className);
+  const objectPosition = extractObjectPosition(className);
+
   return (
-    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+    <div
+      className={className}
+      style={{
+        ...style,
+        position: 'relative',
+        outline: '1px dashed rgba(0, 87, 255, 0.4)',
+        outlineOffset: '2px',
+      }}
+    >
       <img
         src={current}
         alt={alt}
-        className={className}
         style={{
-          ...style,
-          outline: '1px dashed rgba(0, 87, 255, 0.4)',
-          outlineOffset: '2px',
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          objectFit,
+          objectPosition,
         }}
       />
       <button
@@ -68,6 +106,7 @@ export function EditableImage({
           position: 'absolute',
           bottom: 8,
           right: 8,
+          zIndex: 50,
           padding: '6px 12px',
           background: '#0057FF',
           color: 'white',
@@ -76,9 +115,10 @@ export function EditableImage({
           fontSize: 12,
           cursor: uploading ? 'wait' : 'pointer',
           opacity: uploading ? 0.7 : 1,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
           fontFamily: 'Inter, Pretendard, sans-serif',
           fontWeight: 500,
+          whiteSpace: 'nowrap',
         }}
       >
         {uploading ? '업로드 중…' : '이미지 변경'}

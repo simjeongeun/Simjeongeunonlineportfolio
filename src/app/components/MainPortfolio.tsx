@@ -133,19 +133,24 @@ export function MainPortfolio() {
 
       {/* Work Section - Projects Gallery */}
       <section id="work" className="relative w-full min-h-screen bg-white px-6 sm:px-10 md:px-16 lg:px-32 py-16 lg:py-24">
-        <motion.h2
-          className="text-[#1A1A1A] mb-12 lg:mb-20"
-          style={{
-            fontFamily: 'Inter, Pretendard, sans-serif',
-            fontWeight: 300,
-            letterSpacing: '0.1em',
-          }}
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
+          className="mb-12 lg:mb-20"
         >
-          Selected Works
-        </motion.h2>
+          <EditableText
+            contentKey="section.work.heading"
+            defaultValue="Selected Works"
+            as="h2"
+            className="text-[#1A1A1A] block"
+            style={{
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontWeight: 300,
+              letterSpacing: '0.1em',
+            }}
+          />
+        </motion.div>
 
         <motion.div
           className="max-w-6xl"
@@ -191,21 +196,26 @@ export function MainPortfolio() {
       {/* About Section */}
       <section id="about" className="relative w-full min-h-screen bg-[#FAFAFA] px-6 sm:px-10 md:px-16 lg:px-32 py-16 lg:py-24">
         <div className="max-w-4xl mx-auto">
-          <motion.h2
-            className="text-[#1A1A1A] mb-12"
-            style={{
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontWeight: 300,
-              fontSize: '48px',
-              letterSpacing: '0.1em',
-            }}
+          <motion.div
+            className="mb-12"
             initial={{ opacity: 0, y: -20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
           >
-            About
-          </motion.h2>
+            <EditableText
+              contentKey="section.about.heading"
+              defaultValue="About"
+              as="h2"
+              className="text-[#1A1A1A] block"
+              style={{
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontWeight: 300,
+                fontSize: '48px',
+                letterSpacing: '0.1em',
+              }}
+            />
+          </motion.div>
 
           <motion.div
             className="space-y-8"
@@ -240,17 +250,18 @@ export function MainPortfolio() {
             </div>
 
             <div className="pt-8">
-              <h3
-                className="text-[#1A1A1A] mb-6"
+              <EditableText
+                contentKey="about.experience.heading"
+                defaultValue="Education & Experience"
+                as="h3"
+                className="text-[#1A1A1A] mb-6 block"
                 style={{
                   fontFamily: 'Inter, Pretendard, sans-serif',
                   fontWeight: 600,
                   fontSize: '24px',
                   letterSpacing: '0.02em',
                 }}
-              >
-                Education & Experience
-              </h3>
+              />
               
               <div className="space-y-4">
                 <div className="border-l-2 border-[#0057FF] pl-6 py-2">
@@ -286,21 +297,26 @@ export function MainPortfolio() {
       {/* Contact Section */}
       <section id="contact" className="relative w-full min-h-[60vh] bg-white px-6 sm:px-10 md:px-16 lg:px-32 py-16 lg:py-24">
         <div className="max-w-4xl mx-auto">
-          <motion.h2
-            className="text-[#1A1A1A] mb-12"
-            style={{
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontWeight: 300,
-              fontSize: '48px',
-              letterSpacing: '0.1em',
-            }}
+          <motion.div
+            className="mb-12"
             initial={{ opacity: 0, y: -20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
           >
-            Contact
-          </motion.h2>
+            <EditableText
+              contentKey="section.contact.heading"
+              defaultValue="Contact"
+              as="h2"
+              className="text-[#1A1A1A] block"
+              style={{
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontWeight: 300,
+                fontSize: '48px',
+                letterSpacing: '0.1em',
+              }}
+            />
+          </motion.div>
 
           <motion.div
             className="space-y-6"
@@ -356,16 +372,17 @@ export function MainPortfolio() {
             transition={{ duration: 0.8, delay: 0.4 }}
             viewport={{ once: true }}
           >
-            <p
-              className="text-[#999999] text-center"
+            <EditableText
+              contentKey="footer.copyright"
+              defaultValue="© 2026 Sim Jeong Eun. All rights reserved."
+              as="p"
+              className="text-[#999999] text-center block"
               style={{
                 fontFamily: 'Inter, Pretendard, sans-serif',
                 fontWeight: 300,
                 fontSize: '14px',
               }}
-            >
-              © 2026 Sim Jeong Eun. All rights reserved.
-            </p>
+            />
 
             {/* Admin Button */}
             <div className="flex justify-center mt-4">
