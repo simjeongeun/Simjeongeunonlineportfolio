@@ -1,6 +1,22 @@
 import { motion } from 'motion/react';
-import { ArrowRight, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
+import { ArrowRight, GripVertical, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../../lib/auth';
 import { useProjects, type Project } from '../../lib/projects';
 import { EditableText } from '../admin/EditableText';
@@ -9,6 +25,11 @@ export function WorkSection() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { projects, addProject, removeProject, reorderProjects } = useProjects();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const handleAdd = async () => {
     try {
@@ -28,15 +49,31 @@ export function WorkSection() {
     }
   };
 
-  const handleMove = async (fromIdx: number, direction: -1 | 1) => {
-    const toIdx = fromIdx + direction;
-    if (toIdx < 0 || toIdx >= projects.length) return;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = projects.findIndex((p) => p.id === active.id);
+    const newIdx = projects.findIndex((p) => p.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
     try {
-      await reorderProjects(fromIdx, toIdx);
+      await reorderProjects(oldIdx, newIdx);
     } catch (err) {
       alert('순서 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
+
+  const renderedProjects = projects.map((project, index) => (
+    <ProjectRowContainer
+      key={project.id}
+      project={project}
+      index={index}
+      total={projects.length}
+      isAdmin={isAdmin}
+      delay={0.1 * index}
+      onOpen={() => navigate(project.path)}
+      onRemove={() => handleRemove(project.id, project.title)}
+    />
+  ));
 
   return (
     <section
@@ -68,20 +105,15 @@ export function WorkSection() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.2 }}
       >
-        {projects.map((project, index) => (
-          <ProjectRowContainer
-            key={project.id}
-            project={project}
-            index={index}
-            total={projects.length}
-            isAdmin={isAdmin}
-            delay={0.1 * index}
-            onOpen={() => navigate(project.path)}
-            onRemove={() => handleRemove(project.id, project.title)}
-            onMoveUp={() => handleMove(index, -1)}
-            onMoveDown={() => handleMove(index, 1)}
-          />
-        ))}
+        {isAdmin ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              {renderedProjects}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          renderedProjects
+        )}
         {isAdmin && (
           <motion.button
             onClick={handleAdd}
@@ -113,31 +145,58 @@ interface ProjectRowContainerProps {
   delay: number;
   onOpen: () => void;
   onRemove: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
 }
 
 function ProjectRowContainer({
   project,
-  index,
-  total,
   isAdmin,
   delay,
   onOpen,
   onRemove,
-  onMoveUp,
-  onMoveDown,
 }: ProjectRowContainerProps) {
   const k = `projects.${project.id}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project.id, disabled: !isAdmin });
+
+  const sortableStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 30 : undefined,
+  };
+
   return (
     <motion.div
+      ref={setNodeRef}
+      style={sortableStyle}
       className="group relative cursor-pointer border-b border-[#EEEEEE] py-6 md:py-8 px-2 md:px-6 transition-all duration-300 hover:bg-[#F9F9F9]"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay }}
       onClick={isAdmin ? undefined : onOpen}
+      {...attributes}
     >
       <div className="flex items-center justify-between gap-4 md:gap-8">
+        {isAdmin && (
+          <button
+            type="button"
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-shrink-0 text-[#BBBBBB] hover:text-[#0057FF] transition-colors"
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            aria-label="드래그로 순서 변경"
+            title="드래그로 순서 변경"
+          >
+            <GripVertical size={18} />
+          </button>
+        )}
+
         <div className="flex-1 min-w-0">
           <EditableText
             contentKey={`${k}.category`}
@@ -179,24 +238,6 @@ function ProjectRowContainer({
         <div className="flex-shrink-0 flex items-center gap-2 md:gap-3">
           {isAdmin ? (
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                onClick={onMoveUp}
-                disabled={index === 0}
-                className="p-1.5 text-[#999999] hover:text-[#0057FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="위로 이동"
-              >
-                <ChevronUp size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={onMoveDown}
-                disabled={index === total - 1}
-                className="p-1.5 text-[#999999] hover:text-[#0057FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="아래로 이동"
-              >
-                <ChevronDown size={16} />
-              </button>
               <button
                 type="button"
                 onClick={onOpen}

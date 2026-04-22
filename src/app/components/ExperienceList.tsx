@@ -1,12 +1,33 @@
-import { Plus, X } from 'lucide-react';
+import { GripVertical, Plus, X } from 'lucide-react';
 import { motion } from 'motion/react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../lib/auth';
-import { useExperience } from '../lib/experience';
+import { useExperience, type ExperienceItem } from '../lib/experience';
 import { EditableText } from './admin/EditableText';
 
 export function ExperienceList() {
   const { isAdmin } = useAuth();
-  const { items, addItem, removeItem } = useExperience();
+  const { items, addItem, removeItem, reorderItems } = useExperience();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const handleAdd = async () => {
     try {
@@ -25,44 +46,39 @@ export function ExperienceList() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = items.findIndex((i) => i.id === active.id);
+    const newIdx = items.findIndex((i) => i.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    try {
+      await reorderItems(oldIdx, newIdx);
+    } catch (err) {
+      alert('순서 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const renderedItems = items.map((item) => (
+    <ExperienceRow
+      key={item.id}
+      item={item}
+      isAdmin={isAdmin}
+      onRemove={() => handleRemove(item.id)}
+    />
+  ));
+
   return (
     <div className="space-y-4">
-      {items.map((item) => (
-        <div key={item.id} className="group/item relative border-l-2 border-[#0057FF] pl-6 py-2">
-          <EditableText
-            contentKey={`experience.${item.id}.year`}
-            defaultValue={item.year}
-            as="p"
-            className="text-[#666666] block"
-            style={{
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontWeight: 500,
-              fontSize: '14px',
-            }}
-          />
-          <EditableText
-            contentKey={`experience.${item.id}.title`}
-            defaultValue={item.title}
-            as="p"
-            className="text-[#1A1A1A] block"
-            style={{
-              fontFamily: 'Inter, Pretendard, sans-serif',
-              fontWeight: 500,
-              fontSize: '16px',
-            }}
-          />
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => handleRemove(item.id)}
-              className="absolute top-1/2 right-0 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 p-1.5 text-[#999999] hover:text-[#D00]"
-              aria-label="삭제"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-      ))}
+      {isAdmin ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+            {renderedItems}
+          </SortableContext>
+        </DndContext>
+      ) : (
+        renderedItems
+      )}
       {isAdmin && (
         <motion.button
           type="button"
@@ -80,6 +96,88 @@ export function ExperienceList() {
           <Plus size={14} />
           <span>경력 / 학력 추가</span>
         </motion.button>
+      )}
+    </div>
+  );
+}
+
+function ExperienceRow({
+  item,
+  isAdmin,
+  onRemove,
+}: {
+  item: ExperienceItem;
+  isAdmin: boolean;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled: !isAdmin });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 30 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group/item relative border-l-2 border-[#0057FF] pl-6 py-2 flex items-start gap-3"
+      {...attributes}
+    >
+      {isAdmin && (
+        <button
+          type="button"
+          {...listeners}
+          className="flex-shrink-0 mt-1 text-[#BBBBBB] hover:text-[#0057FF] transition-colors"
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          aria-label="드래그로 순서 변경"
+          title="드래그로 순서 변경"
+        >
+          <GripVertical size={16} />
+        </button>
+      )}
+      <div className="flex-1 min-w-0">
+        <EditableText
+          contentKey={`experience.${item.id}.year`}
+          defaultValue={item.year}
+          as="p"
+          className="text-[#666666] block"
+          style={{
+            fontFamily: 'Inter, Pretendard, sans-serif',
+            fontWeight: 500,
+            fontSize: '14px',
+          }}
+        />
+        <EditableText
+          contentKey={`experience.${item.id}.title`}
+          defaultValue={item.title}
+          as="p"
+          className="text-[#1A1A1A] block"
+          style={{
+            fontFamily: 'Inter, Pretendard, sans-serif',
+            fontWeight: 500,
+            fontSize: '16px',
+          }}
+        />
+      </div>
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200 p-1.5 text-[#999999] hover:text-[#D00]"
+          aria-label="삭제"
+        >
+          <X size={16} />
+        </button>
       )}
     </div>
   );
