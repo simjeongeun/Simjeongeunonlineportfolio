@@ -25,8 +25,10 @@ export function AdminLoginModal({ open, onClose }: AdminLoginModalProps) {
       setPassword('');
       onClose();
     } catch (err) {
-      setError('로그인 실패. 이메일/비밀번호를 확인해주세요.');
-      if (import.meta.env.DEV) console.warn('[admin] signIn error', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const code = (err as { code?: string })?.code;
+      setError(code ? `${code}: ${msg}` : msg);
+      console.warn('[admin] signIn error', err);
     } finally {
       setBusy(false);
     }

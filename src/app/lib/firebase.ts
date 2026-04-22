@@ -26,16 +26,18 @@ function ensureApp(): FirebaseApp | null {
   if (app) return app;
   const missing = missingKeys();
   if (missing.length > 0) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        `[firebase] Missing env vars: ${missing.join(', ')}. ` +
-          'Copy .env.example to .env.local and fill in Firebase config.'
-      );
-    }
+    console.warn(
+      `[firebase] Missing env vars: ${missing.join(', ')}. ` +
+        'Add VITE_FIREBASE_* variables in Vercel Settings → Environment Variables and redeploy without cache.'
+    );
     return null;
   }
   app = getApps()[0] ?? initializeApp(firebaseConfig);
   return app;
+}
+
+export function getMissingFirebaseEnvKeys(): string[] {
+  return missingKeys();
 }
 
 export function getFirebaseAuth(): Auth | null {
