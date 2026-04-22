@@ -6,21 +6,24 @@ import { ProjectsProvider } from './lib/projects';
 import { NavProvider } from './lib/nav';
 import { ExperienceProvider } from './lib/experience';
 import { SocialLinksProvider } from './lib/social-links';
+import { AdminsProvider } from './lib/admins';
 
 export default function App() {
   return (
     <AuthProvider>
-      <ContentProvider>
-        <ProjectsProvider>
-          <NavProvider>
-            <ExperienceProvider>
-              <SocialLinksProvider>
-                <RouterProvider router={router} />
-              </SocialLinksProvider>
-            </ExperienceProvider>
-          </NavProvider>
-        </ProjectsProvider>
-      </ContentProvider>
+      <AdminsProvider>
+        <ContentProvider>
+          <ProjectsProvider>
+            <NavProvider>
+              <ExperienceProvider>
+                <SocialLinksProvider>
+                  <RouterProvider router={router} />
+                </SocialLinksProvider>
+              </ExperienceProvider>
+            </NavProvider>
+          </ProjectsProvider>
+        </ContentProvider>
+      </AdminsProvider>
     </AuthProvider>
   );
 }

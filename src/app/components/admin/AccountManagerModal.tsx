@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { X, Mail } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
+import { useAdmins } from '../../lib/admins';
 
 type AccountManagerModalProps = {
   open: boolean;
@@ -8,7 +10,8 @@ type AccountManagerModalProps = {
 
 export function AccountManagerModal({ open, onClose }: AccountManagerModalProps) {
   const { user, changePassword, createAdmin } = useAuth();
-  const [tab, setTab] = useState<'password' | 'create'>('password');
+  const { emails, addEmail, removeEmail } = useAdmins();
+  const [tab, setTab] = useState<'password' | 'create' | 'list'>('list');
 
   // password tab state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -70,9 +73,10 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
     setCreateBusy(true);
     try {
       await createAdmin(newEmail, newUserPassword);
+      await addEmail(newEmail);
       setCreateMsg({
         kind: 'ok',
-        text: `새 관리자 계정 생성 완료: ${newEmail.trim()}`,
+        text: `관리자 추가 완료: ${newEmail.trim()}`,
       });
       setNewEmail('');
       setNewUserPassword('');
@@ -80,6 +84,17 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
       setCreateMsg({ kind: 'err', text: err instanceof Error ? err.message : String(err) });
     } finally {
       setCreateBusy(false);
+    }
+  };
+
+  const handleRemoveAdmin = async (email: string) => {
+    const isSelf = user?.email && user.email.toLowerCase() === email.toLowerCase();
+    const label = isSelf ? '⚠️ 본인 계정을 제거합니다. 정말 진행할까요?' : `"${email}" 관리자 권한을 제거할까요?`;
+    if (!confirm(label)) return;
+    try {
+      await removeEmail(email);
+    } catch (err) {
+      alert('제거 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -131,8 +146,8 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
           padding: 0,
           borderRadius: 12,
           minWidth: 360,
-          maxWidth: 440,
-          width: '90%',
+          maxWidth: 480,
+          width: '92%',
           boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
           fontFamily: 'Inter, Pretendard, sans-serif',
           overflow: 'hidden',
@@ -150,16 +165,124 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
         </div>
 
         <div style={{ display: 'flex', margin: '20px 0 0', borderBottom: '1px solid #EEE' }}>
-          <button type="button" onClick={() => setTab('password')} style={tabBtn(tab === 'password')}>
-            비밀번호 변경
+          <button type="button" onClick={() => setTab('list')} style={tabBtn(tab === 'list')}>
+            관리자 목록
           </button>
           <button type="button" onClick={() => setTab('create')} style={tabBtn(tab === 'create')}>
-            관리자 계정 추가
+            계정 추가
+          </button>
+          <button type="button" onClick={() => setTab('password')} style={tabBtn(tab === 'password')}>
+            비밀번호 변경
           </button>
         </div>
 
         <div style={{ padding: '20px 28px 24px' }}>
-          {tab === 'password' ? (
+          {tab === 'list' && (
+            <div>
+              {emails.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: '#999' }}>
+                  아직 관리자 목록이 비어있습니다. 로그인하면 자동으로 추가됩니다.
+                </p>
+              ) : (
+                <ul
+                  style={{
+                    listStyle: 'none',
+                    padding: 0,
+                    margin: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  {emails.map((email) => {
+                    const isSelf = user?.email?.toLowerCase() === email.toLowerCase();
+                    return (
+                      <li
+                        key={email}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '10px 12px',
+                          border: '1px solid #EEE',
+                          borderRadius: 8,
+                          background: isSelf ? '#F9FBFF' : 'white',
+                        }}
+                      >
+                        <Mail size={14} color="#0057FF" />
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: 13,
+                            color: '#1A1A1A',
+                          }}
+                        >
+                          {email}
+                          {isSelf && (
+                            <span style={{ color: '#0057FF', fontSize: 11, marginLeft: 8 }}>
+                              (본인)
+                            </span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAdmin(email)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#999',
+                            cursor: 'pointer',
+                            padding: 4,
+                            borderRadius: 4,
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#D00')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#999')}
+                          aria-label={`${email} 제거`}
+                          title="관리자 권한 제거"
+                        >
+                          <X size={14} />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p
+                style={{
+                  margin: '16px 0 0',
+                  fontSize: 11,
+                  color: '#999',
+                  lineHeight: 1.6,
+                }}
+              >
+                제거하면 해당 계정은 더 이상 내용을 편집할 수 없습니다 (로그인은 여전히 가능).
+                완전한 계정 삭제는 Firebase Console에서 해야 합니다.
+              </p>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetAll();
+                    onClose();
+                  }}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '10px 14px',
+                    background: 'transparent',
+                    color: '#666',
+                    border: '1px solid #DDD',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tab === 'password' && (
             <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input
                 type="password"
@@ -238,7 +361,9 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
                 </button>
               </div>
             </form>
-          ) : (
+          )}
+
+          {tab === 'create' && (
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <p style={{ margin: 0, fontSize: 12, color: '#666', lineHeight: 1.6 }}>
                 새로 만든 계정은 이 사이트의 전체 관리 권한을 갖게 됩니다. 신뢰하는 사람에게만 공유하세요.

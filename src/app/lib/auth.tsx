@@ -111,11 +111,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createAdmin: async (email, password) => {
         const auth = getFirebaseAuth();
         if (!auth) throw new Error('Firebase가 초기화되지 않았습니다.');
-        // Use a secondary Firebase app instance so creating the new user
-        // does not replace the current admin's session.
+        // Use a unique secondary app name so repeated calls in one session
+        // don't collide with a previously initialized instance.
         const primaryApp = getApp();
-        const SECONDARY_NAME = 'admin-creator';
-        const secondaryApp = initializeApp(primaryApp.options, SECONDARY_NAME);
+        const secondaryName = `admin-creator-${Date.now()}`;
+        const secondaryApp = initializeApp(primaryApp.options, secondaryName);
         const secondaryAuth = getAuth(secondaryApp);
         try {
           const result = await createUserWithEmailAndPassword(
