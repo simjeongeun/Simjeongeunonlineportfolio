@@ -1,11 +1,31 @@
-import { ChevronUp, ChevronDown, X, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { useAuth } from '../../lib/auth';
 import {
   useProjectModules,
   MODULE_LABELS,
   type ModuleType,
+  type ProjectModule,
 } from '../../lib/project-modules';
 import { ModuleRenderer } from './ModuleRenderer';
+import { SortableModule } from './SortableModule';
 
 type ProjectModulesProps = {
   projectId: string;
@@ -30,6 +50,12 @@ const PALETTE: ModuleType[] = [
 export function ProjectModules({ projectId }: ProjectModulesProps) {
   const { isAdmin } = useAuth();
   const { modules, addModule, removeModule, reorderModules } = useProjectModules(projectId);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   if (!isAdmin && modules.length === 0) return null;
 
@@ -58,60 +84,110 @@ export function ProjectModules({ projectId }: ProjectModulesProps) {
     }
   };
 
-  return (
-    <div className="mt-24 space-y-16">
-      {modules.map((module, index) => (
-        <div key={module.id} className="relative group/module">
-          <ModuleRenderer projectId={projectId} module={module} />
-          {isAdmin && (
-            <div
-              className="absolute -top-3 right-0 flex items-center gap-1 bg-white border border-[#E5E5E5] rounded-full px-2 py-1 shadow-sm opacity-0 group-hover/module:opacity-100 transition-opacity duration-200"
-              style={{ zIndex: 40 }}
-            >
-              <button
-                type="button"
-                onClick={() => handleMove(index, -1)}
-                disabled={index === 0}
-                className="p-1 text-[#999999] hover:text-[#0057FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="위로"
-              >
-                <ChevronUp size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMove(index, 1)}
-                disabled={index === modules.length - 1}
-                className="p-1 text-[#999999] hover:text-[#0057FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                aria-label="아래로"
-              >
-                <ChevronDown size={14} />
-              </button>
-              <span className="w-px h-3 bg-[#EEEEEE] mx-1" />
-              <span
-                className="text-[#999999]"
-                style={{
-                  fontFamily: 'Inter, Pretendard, sans-serif',
-                  fontSize: '11px',
-                  letterSpacing: '0.03em',
-                }}
-              >
-                {MODULE_LABELS[module.type]}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleRemove(module.id)}
-                className="p-1 text-[#999999] hover:text-[#D00] transition-colors ml-1"
-                aria-label="삭제"
-              >
-                <X size={14} />
-              </button>
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    if (!over || active.id === over.id) return;
+    const oldIdx = modules.findIndex((m) => m.id === active.id);
+    const newIdx = modules.findIndex((m) => m.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    try {
+      await reorderModules(oldIdx, newIdx);
+    } catch (err) {
+      alert('순서 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleDragCancel = () => setActiveId(null);
+
+  const activeModule: ProjectModule | null = activeId
+    ? modules.find((m) => m.id === activeId) ?? null
+    : null;
+
+  const renderedList = (
+    <div className="space-y-16">
+      {modules.map((module, index) => {
+        const moduleContent = <ModuleRenderer projectId={projectId} module={module} />;
+        if (!isAdmin) {
+          return (
+            <div key={module.id} className="relative">
+              {moduleContent}
             </div>
-          )}
-        </div>
-      ))}
+          );
+        }
+        return (
+          <SortableModule
+            key={module.id}
+            module={module}
+            index={index}
+            total={modules.length}
+            onMoveUp={() => handleMove(index, -1)}
+            onMoveDown={() => handleMove(index, 1)}
+            onRemove={() => handleRemove(module.id)}
+          >
+            {moduleContent}
+          </SortableModule>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div className="mt-24">
+      {isAdmin ? (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          <SortableContext
+            items={modules.map((m) => m.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {renderedList}
+          </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activeModule ? (
+              <div className="opacity-90 shadow-2xl bg-white rounded border border-[#E5E5E5] p-4 pointer-events-none">
+                <p
+                  className="text-[#0057FF] mb-2"
+                  style={{
+                    fontFamily: 'Inter, Pretendard, sans-serif',
+                    fontWeight: 500,
+                    fontSize: '11px',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  이동 중
+                </p>
+                <p
+                  className="text-[#1A1A1A]"
+                  style={{
+                    fontFamily: 'Inter, Pretendard, sans-serif',
+                    fontWeight: 500,
+                    fontSize: '14px',
+                  }}
+                >
+                  {MODULE_LABELS[activeModule.type]}
+                </p>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      ) : (
+        renderedList
+      )}
 
       {isAdmin && (
-        <div className="pt-8 border-t border-dashed border-[#DDDDDD]">
+        <div className="mt-16 pt-8 border-t border-dashed border-[#DDDDDD]">
           <p
             className="text-[#999999] mb-4"
             style={{
@@ -122,7 +198,7 @@ export function ProjectModules({ projectId }: ProjectModulesProps) {
               textTransform: 'uppercase',
             }}
           >
-            모듈 추가
+            모듈 추가 · 드래그해서 순서 변경
           </p>
           <div className="flex flex-wrap gap-2">
             {PALETTE.map((type) => (
@@ -148,3 +224,4 @@ export function ProjectModules({ projectId }: ProjectModulesProps) {
     </div>
   );
 }
+
