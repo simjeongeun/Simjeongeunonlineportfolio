@@ -323,20 +323,16 @@ export function EditableImage({
     ...style,
     position: 'relative',
     overflow: 'hidden',
-    // Defaults explicitly reset anything a previous render could have set.
-    aspectRatio: undefined,
-    height: undefined,
-    width: undefined,
-    ...(isManual
-      ? {
-          height: `${effectiveHeight ?? 400}px`,
-          width: `${effectiveWidthPct ?? 100}%`,
-          aspectRatio: 'auto',
-        }
-      : aspectOverride
-      ? { aspectRatio: aspectOverride }
-      : {}),
   };
+  if (isManual) {
+    wrapperStyle.height = `${effectiveHeight ?? 400}px`;
+    wrapperStyle.width = `${effectiveWidthPct ?? 100}%`;
+    wrapperStyle.aspectRatio = 'auto';
+  } else if (aspectOverride) {
+    wrapperStyle.aspectRatio = aspectOverride;
+  }
+  // Auto case (isManual=false, no override): leave the aspect/height/width
+  // keys out entirely so the className's aspect-[...] utility owns the box.
 
   const fillStyle: CSSProperties = {
     position: 'absolute',
@@ -418,7 +414,7 @@ export function EditableImage({
         )}
         {isManual && (
           <>
-            {/* Bottom edge — vertical resize */}
+            {/* Edges */}
             <div
               onPointerDown={startResize('height')}
               className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
@@ -431,7 +427,7 @@ export function EditableImage({
                 touchAction: 'none',
                 zIndex: 10,
               }}
-              title="세로 크기 조절"
+              title="아래 가장자리: 세로 크기"
             >
               <span
                 style={{
@@ -439,13 +435,10 @@ export function EditableImage({
                   width: 32,
                   height: 3,
                   borderRadius: 2,
-                  background:
-                    resizing === 'height' ? '#0057FF' : 'rgba(0,87,255,0.6)',
+                  background: resizing === 'height' ? '#0057FF' : 'rgba(0,87,255,0.6)',
                 }}
               />
             </div>
-
-            {/* Right edge — horizontal resize */}
             <div
               onPointerDown={startResize('width')}
               className="absolute top-0 bottom-0 right-0 flex items-center justify-center"
@@ -458,7 +451,7 @@ export function EditableImage({
                 touchAction: 'none',
                 zIndex: 10,
               }}
-              title="가로 크기 조절"
+              title="오른쪽 가장자리: 가로 크기"
             >
               <span
                 style={{
@@ -466,29 +459,54 @@ export function EditableImage({
                   width: 3,
                   height: 32,
                   borderRadius: 2,
-                  background:
-                    resizing === 'width' ? '#0057FF' : 'rgba(0,87,255,0.6)',
+                  background: resizing === 'width' ? '#0057FF' : 'rgba(0,87,255,0.6)',
                 }}
               />
             </div>
 
-            {/* Bottom-right corner — both axes */}
-            <div
-              onPointerDown={startResize('both')}
-              className="absolute bottom-0 right-0"
-              style={{
-                width: 18,
-                height: 18,
-                cursor: 'nwse-resize',
+            {/* Corners — all anchor at top-left and drag toward cursor, so
+                every corner behaves as a diagonal resize handle. Visual cues
+                make it clear the frame is resizable from anywhere. */}
+            {(['tl', 'tr', 'bl', 'br'] as const).map((pos) => {
+              const style: CSSProperties = {
+                position: 'absolute',
+                width: 14,
+                height: 14,
+                borderRadius: 2,
                 background:
                   resizing === 'both' ? '#0057FF' : 'rgba(0,87,255,0.85)',
                 transition: 'background 120ms',
                 touchAction: 'none',
-                zIndex: 11,
-                clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
-              }}
-              title="모서리 드래그: 가로·세로 동시 조절"
-            />
+                zIndex: 12,
+                border: '2px solid white',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              };
+              if (pos === 'tl') {
+                style.top = -7;
+                style.left = -7;
+                style.cursor = 'nwse-resize';
+              } else if (pos === 'tr') {
+                style.top = -7;
+                style.right = -7;
+                style.cursor = 'nesw-resize';
+              } else if (pos === 'bl') {
+                style.bottom = -7;
+                style.left = -7;
+                style.cursor = 'nesw-resize';
+              } else {
+                style.bottom = -7;
+                style.right = -7;
+                style.cursor = 'nwse-resize';
+              }
+              return (
+                <div
+                  key={pos}
+                  onPointerDown={startResize('both')}
+                  style={style}
+                  title="모서리 드래그로 가로·세로 동시 조절"
+                />
+              );
+            })}
 
             {/* Size badge */}
             <div
@@ -499,6 +517,7 @@ export function EditableImage({
                 fontFamily: 'Inter, Pretendard, sans-serif',
                 fontSize: 11,
                 fontWeight: 500,
+                marginRight: 14,
               }}
             >
               {(effectiveWidthPct ?? 100).toFixed(0)}% × {effectiveHeight ?? 400}px
