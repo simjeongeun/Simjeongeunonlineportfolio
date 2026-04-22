@@ -26,6 +26,11 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
   const [createBusy, setCreateBusy] = useState(false);
   const [createMsg, setCreateMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
+  // list tab — inline "add existing email to list" form
+  const [listEmail, setListEmail] = useState('');
+  const [listBusy, setListBusy] = useState(false);
+  const [listMsg, setListMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
   if (!open) return null;
 
   const resetAll = () => {
@@ -34,8 +39,35 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
     setConfirmPassword('');
     setNewEmail('');
     setNewUserPassword('');
+    setListEmail('');
     setPwMsg(null);
     setCreateMsg(null);
+    setListMsg(null);
+  };
+
+  const handleAddEmailToList = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setListMsg(null);
+    const target = listEmail.trim();
+    if (!target) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+      setListMsg({ kind: 'err', text: '이메일 형식이 올바르지 않습니다.' });
+      return;
+    }
+    if (emails.includes(target.toLowerCase())) {
+      setListMsg({ kind: 'err', text: '이미 목록에 있습니다.' });
+      return;
+    }
+    setListBusy(true);
+    try {
+      await addEmail(target);
+      setListMsg({ kind: 'ok', text: `추가됨: ${target}` });
+      setListEmail('');
+    } catch (err) {
+      setListMsg({ kind: 'err', text: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setListBusy(false);
+    }
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -247,9 +279,77 @@ export function AccountManagerModal({ open, onClose }: AccountManagerModalProps)
                   })}
                 </ul>
               )}
+              <form
+                onSubmit={handleAddEmailToList}
+                style={{
+                  marginTop: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  padding: '14px 14px',
+                  border: '1px dashed #DDD',
+                  borderRadius: 8,
+                  background: '#FAFAFA',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 11,
+                    color: '#666',
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    fontWeight: 500,
+                  }}
+                >
+                  기존 계정을 목록에 추가
+                </p>
+                <p style={{ margin: 0, fontSize: 11, color: '#999', lineHeight: 1.6 }}>
+                  Firebase Console 이나 다른 경로로 만든 관리자 이메일을 여기에 추가하면 바로 편집 권한이 생깁니다. (Firebase Auth 계정은 이미 있어야 함)
+                </p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="email"
+                    placeholder="admin@example.com"
+                    value={listEmail}
+                    onChange={(e) => setListEmail(e.target.value)}
+                    autoComplete="off"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={listBusy || !listEmail.trim()}
+                    style={{
+                      padding: '10px 14px',
+                      background: '#0057FF',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: listBusy ? 'wait' : 'pointer',
+                      opacity: listBusy || !listEmail.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {listBusy ? '추가 중…' : '추가'}
+                  </button>
+                </div>
+                {listMsg && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: listMsg.kind === 'ok' ? '#0057FF' : '#D00',
+                    }}
+                  >
+                    {listMsg.text}
+                  </p>
+                )}
+              </form>
+
               <p
                 style={{
-                  margin: '16px 0 0',
+                  margin: '14px 0 0',
                   fontSize: 11,
                   color: '#999',
                   lineHeight: 1.6,
