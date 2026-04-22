@@ -1,7 +1,7 @@
 import { Navigation } from './Navigation';
 import { InteractiveArtwork } from './InteractiveArtwork';
 import { motion } from 'motion/react';
-import { ArrowRight, Mail, Phone, Settings, Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowRight, Mail, Phone, Settings, Plus, X, ChevronUp, ChevronDown, UserCog } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/auth';
@@ -9,6 +9,7 @@ import { useContentValue } from '../lib/content';
 import { useProjects, type Project } from '../lib/projects';
 import { EditableText } from './admin/EditableText';
 import { AdminLoginModal } from './admin/AdminLoginModal';
+import { AccountManagerModal } from './admin/AccountManagerModal';
 import { ExperienceList } from './ExperienceList';
 import { ContactSocialLinks } from './ContactSocialLinks';
 import { DynamicSections } from './DynamicSections';
@@ -20,6 +21,7 @@ export function MainPortfolio() {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('work');
   const [loginOpen, setLoginOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const { isAdmin, signOut } = useAuth();
   const { projects, addProject, removeProject, reorderProjects } = useProjects();
 
@@ -365,21 +367,36 @@ export function MainPortfolio() {
             />
 
             {/* Admin Button */}
-            <div className="flex justify-center mt-4">
+            <div className="flex justify-center mt-4 gap-2">
               {isAdmin ? (
-                <button
-                  onClick={() => { void signOut(); }}
-                  className="flex items-center gap-2 px-4 py-2 text-[#0057FF] border border-[#0057FF] rounded-full hover:bg-[#0057FF] hover:text-white transition-all duration-200"
-                  style={{
-                    fontFamily: 'Inter, Pretendard, sans-serif',
-                    fontWeight: 500,
-                    fontSize: '12px',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  <Settings size={14} />
-                  관리자 모드 해제
-                </button>
+                <>
+                  <button
+                    onClick={() => setAccountOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-[#1A1A1A] border border-[#DDDDDD] rounded-full hover:border-[#0057FF] hover:text-[#0057FF] transition-all duration-200"
+                    style={{
+                      fontFamily: 'Inter, Pretendard, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '12px',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <UserCog size={14} />
+                    계정 관리
+                  </button>
+                  <button
+                    onClick={() => { void signOut(); }}
+                    className="flex items-center gap-2 px-4 py-2 text-[#0057FF] border border-[#0057FF] rounded-full hover:bg-[#0057FF] hover:text-white transition-all duration-200"
+                    style={{
+                      fontFamily: 'Inter, Pretendard, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '12px',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <Settings size={14} />
+                    관리자 모드 해제
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => setLoginOpen(true)}
@@ -402,6 +419,7 @@ export function MainPortfolio() {
       <DynamicSections />
 
       <AdminLoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
+      <AccountManagerModal open={accountOpen} onClose={() => setAccountOpen(false)} />
     </div>
   );
 }
