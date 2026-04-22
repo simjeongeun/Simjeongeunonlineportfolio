@@ -30,7 +30,16 @@ const MIN_HEIGHT = 120;
 const MAX_HEIGHT = 2400;
 const MIN_WIDTH_PCT = 25;
 const MAX_WIDTH_PCT = 100;
-type ResizeAxis = 'height' | 'width' | 'both';
+type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+function extractAspectFromClassName(className?: string): string | undefined {
+  if (!className) return undefined;
+  const arb = className.match(/\baspect-\[(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\]/);
+  if (arb) return `${arb[1]} / ${arb[2]}`;
+  if (/\baspect-square\b/.test(className)) return '1 / 1';
+  if (/\baspect-video\b/.test(className)) return '16 / 9';
+  return undefined;
+}
 
 function normalizeAspect(input: string): string | null {
   const trimmed = input.trim();
@@ -87,7 +96,7 @@ export function EditableImage({
   const [liveHeight, setLiveHeight] = useState<number | null>(null);
   const [liveWidthPct, setLiveWidthPct] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [resizing, setResizing] = useState<ResizeAxis | null>(null);
+  const [resizing, setResizing] = useState<ResizeHandle | null>(null);
 
   const isManual = storedAspect === MANUAL_KEY;
   const manualHeight = isManual ? parseInt(storedHeight, 10) || undefined : undefined;
@@ -154,54 +163,68 @@ export function EditableImage({
     };
   }, [dragging, storedPosition, contentKey, set]);
 
-  // Manual-mode resize (height, width, or both depending on which handle was grabbed)
+  // Manual-mode resize: delta-based math so every handle grows the box in
+  // its own direction. Without this, top-left / bottom-left handles make
+  // width go negative and clamp to MIN instantly.
   useEffect(() => {
     if (!resizing) return;
     const wrapper = wrapperRef.current;
     const parent = wrapper?.parentElement;
     if (!wrapper || !parent) return;
-    const parentRect = parent.getBoundingClientRect();
-    const wrapperRect = wrapper.getBoundingClientRect();
-    const startLeft = wrapperRect.left;
-    const startTop = wrapperRect.top;
-
-    let latestHeight = manualHeight ?? wrapper.offsetHeight;
-    let latestWidthPct = manualWidthPct ?? (wrapper.offsetWidth / parent.offsetWidth) * 100;
+    const startW = wrapper.offsetWidth;
+    const startH = wrapper.offsetHeight;
+    const parentW = parent.offsetWidth;
+    const minWidthPx = (parentW * MIN_WIDTH_PCT) / 100;
+    const maxWidthPx = (parentW * MAX_WIDTH_PCT) / 100;
+    const pointer = { x: 0, y: 0, set: false };
+    const handle = resizing;
+    let latestH = startH;
+    let latestWidthPct = (startW / parentW) * 100;
 
     const onMove = (e: PointerEvent) => {
-      if (resizing === 'height' || resizing === 'both') {
-        const targetH = e.clientY - startTop;
-        latestHeight = Math.round(clamp(targetH, MIN_HEIGHT, MAX_HEIGHT));
-        setLiveHeight(latestHeight);
+      if (!pointer.set) {
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+        pointer.set = true;
+        return;
       }
-      if (resizing === 'width' || resizing === 'both') {
-        const targetW = e.clientX - startLeft;
-        const pct = (targetW / parentRect.width) * 100;
-        latestWidthPct = clamp(pct, MIN_WIDTH_PCT, MAX_WIDTH_PCT);
-        setLiveWidthPct(Math.round(latestWidthPct * 10) / 10);
-      }
+      const dx = e.clientX - pointer.x;
+      const dy = e.clientY - pointer.y;
+      let dW = 0;
+      let dH = 0;
+      if (handle === 'e' || handle === 'ne' || handle === 'se') dW = dx;
+      if (handle === 'w' || handle === 'nw' || handle === 'sw') dW = -dx;
+      if (handle === 's' || handle === 'sw' || handle === 'se') dH = dy;
+      if (handle === 'n' || handle === 'nw' || handle === 'ne') dH = -dy;
+
+      const newW = clamp(startW + dW, minWidthPx, maxWidthPx);
+      const newH = clamp(startH + dH, MIN_HEIGHT, MAX_HEIGHT);
+      latestH = Math.round(newH);
+      latestWidthPct = (newW / parentW) * 100;
+      setLiveHeight(latestH);
+      setLiveWidthPct(Math.round(latestWidthPct * 10) / 10);
     };
+
+    const touchesHeight = handle === 'n' || handle === 's' || handle.length === 2;
+    const touchesWidth = handle === 'e' || handle === 'w' || handle.length === 2;
+
     const onUp = async () => {
-      const axis = resizing;
       setResizing(null);
       try {
-        if (axis === 'height' || axis === 'both') {
-          await set(`${contentKey}.height`, `${latestHeight}`);
-        }
-        if (axis === 'width' || axis === 'both') {
-          await set(`${contentKey}.widthPct`, `${latestWidthPct.toFixed(1)}`);
-        }
+        if (touchesHeight) await set(`${contentKey}.height`, `${latestH}`);
+        if (touchesWidth) await set(`${contentKey}.widthPct`, `${latestWidthPct.toFixed(1)}`);
       } catch (err) {
         console.error('[EditableImage] resize save failed', err);
       }
     };
+
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp, { once: true });
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [resizing, manualHeight, manualWidthPct, contentKey, set]);
+  }, [resizing, contentKey, set]);
 
   const handleImgLoad = () => {
     const img = imgRef.current;
@@ -215,11 +238,11 @@ export function EditableImage({
     setDragging(true);
   };
 
-  const startResize = (axis: ResizeAxis) => (e: React.PointerEvent) => {
+  const startResize = (handle: ResizeHandle) => (e: React.PointerEvent) => {
     if (!isAdmin) return;
     e.preventDefault();
     e.stopPropagation();
-    setResizing(axis);
+    setResizing(handle);
   };
 
   const pickFile = () => fileRef.current?.click();
@@ -330,9 +353,13 @@ export function EditableImage({
     wrapperStyle.aspectRatio = 'auto';
   } else if (aspectOverride) {
     wrapperStyle.aspectRatio = aspectOverride;
+  } else {
+    // Auto: parse the className's aspect-[...] utility and mirror it as
+    // inline CSS so the box always has a concrete size, even if the
+    // Tailwind JIT didn't ship that specific arbitrary class in this build.
+    const classAspect = extractAspectFromClassName(className);
+    wrapperStyle.aspectRatio = classAspect ?? '16 / 9';
   }
-  // Auto case (isManual=false, no override): leave the aspect/height/width
-  // keys out entirely so the className's aspect-[...] utility owns the box.
 
   const fillStyle: CSSProperties = {
     position: 'absolute',
@@ -414,96 +441,93 @@ export function EditableImage({
         )}
         {isManual && (
           <>
-            {/* Edges */}
-            <div
-              onPointerDown={startResize('height')}
-              className="absolute left-0 right-0 bottom-0 flex items-center justify-center"
-              style={{
-                height: 10,
-                cursor: 'ns-resize',
-                background:
-                  resizing === 'height' ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
+            {/* Edges — each grabs its own direction */}
+            {(
+              [
+                { h: 's', side: 'bottom', cursor: 'ns-resize', horizontal: true },
+                { h: 'n', side: 'top', cursor: 'ns-resize', horizontal: true },
+                { h: 'e', side: 'right', cursor: 'ew-resize', horizontal: false },
+                { h: 'w', side: 'left', cursor: 'ew-resize', horizontal: false },
+              ] as const
+            ).map((edge) => {
+              const active = resizing === edge.h;
+              const base: CSSProperties = {
+                position: 'absolute',
+                cursor: edge.cursor,
+                background: active ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
                 transition: 'background 120ms',
                 touchAction: 'none',
                 zIndex: 10,
-              }}
-              title="아래 가장자리: 세로 크기"
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 32,
-                  height: 3,
-                  borderRadius: 2,
-                  background: resizing === 'height' ? '#0057FF' : 'rgba(0,87,255,0.6)',
-                }}
-              />
-            </div>
-            <div
-              onPointerDown={startResize('width')}
-              className="absolute top-0 bottom-0 right-0 flex items-center justify-center"
-              style={{
-                width: 10,
-                cursor: 'ew-resize',
-                background:
-                  resizing === 'width' ? 'rgba(0,87,255,0.35)' : 'rgba(0,87,255,0.12)',
-                transition: 'background 120ms',
-                touchAction: 'none',
-                zIndex: 10,
-              }}
-              title="오른쪽 가장자리: 가로 크기"
-            >
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 3,
-                  height: 32,
-                  borderRadius: 2,
-                  background: resizing === 'width' ? '#0057FF' : 'rgba(0,87,255,0.6)',
-                }}
-              />
-            </div>
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              };
+              if (edge.horizontal) {
+                base.left = 0;
+                base.right = 0;
+                base.height = 10;
+                if (edge.side === 'bottom') base.bottom = 0;
+                else base.top = 0;
+              } else {
+                base.top = 0;
+                base.bottom = 0;
+                base.width = 10;
+                if (edge.side === 'right') base.right = 0;
+                else base.left = 0;
+              }
+              return (
+                <div
+                  key={edge.h}
+                  onPointerDown={startResize(edge.h)}
+                  style={base}
+                  title={`${edge.side} edge`}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: edge.horizontal ? 32 : 3,
+                      height: edge.horizontal ? 3 : 32,
+                      borderRadius: 2,
+                      background: active ? '#0057FF' : 'rgba(0,87,255,0.6)',
+                    }}
+                  />
+                </div>
+              );
+            })}
 
-            {/* Corners — all anchor at top-left and drag toward cursor, so
-                every corner behaves as a diagonal resize handle. Visual cues
-                make it clear the frame is resizable from anywhere. */}
-            {(['tl', 'tr', 'bl', 'br'] as const).map((pos) => {
+            {/* Corners — each grows the box toward its own cursor direction */}
+            {(
+              [
+                { h: 'nw', top: -7, left: -7, cursor: 'nwse-resize' },
+                { h: 'ne', top: -7, right: -7, cursor: 'nesw-resize' },
+                { h: 'sw', bottom: -7, left: -7, cursor: 'nesw-resize' },
+                { h: 'se', bottom: -7, right: -7, cursor: 'nwse-resize' },
+              ] as const
+            ).map((c) => {
+              const active = resizing === c.h;
               const style: CSSProperties = {
                 position: 'absolute',
                 width: 14,
                 height: 14,
                 borderRadius: 2,
-                background:
-                  resizing === 'both' ? '#0057FF' : 'rgba(0,87,255,0.85)',
+                background: active ? '#0057FF' : 'rgba(0,87,255,0.85)',
                 transition: 'background 120ms',
                 touchAction: 'none',
                 zIndex: 12,
                 border: '2px solid white',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                cursor: c.cursor,
+                top: 'top' in c ? c.top : undefined,
+                left: 'left' in c ? c.left : undefined,
+                right: 'right' in c ? c.right : undefined,
+                bottom: 'bottom' in c ? c.bottom : undefined,
               };
-              if (pos === 'tl') {
-                style.top = -7;
-                style.left = -7;
-                style.cursor = 'nwse-resize';
-              } else if (pos === 'tr') {
-                style.top = -7;
-                style.right = -7;
-                style.cursor = 'nesw-resize';
-              } else if (pos === 'bl') {
-                style.bottom = -7;
-                style.left = -7;
-                style.cursor = 'nesw-resize';
-              } else {
-                style.bottom = -7;
-                style.right = -7;
-                style.cursor = 'nwse-resize';
-              }
               return (
                 <div
-                  key={pos}
-                  onPointerDown={startResize('both')}
+                  key={c.h}
+                  onPointerDown={startResize(c.h)}
                   style={style}
-                  title="모서리 드래그로 가로·세로 동시 조절"
+                  title="코너 드래그: 가로·세로 동시"
                 />
               );
             })}
