@@ -28,9 +28,18 @@ const MANUAL_KEY = 'manual';
 const DEFAULT_POSITION = '50% 50%';
 const MIN_HEIGHT = 120;
 const MAX_HEIGHT = 2400;
-const MIN_WIDTH_PCT = 25;
-const MAX_WIDTH_PCT = 100;
+const MIN_WIDTH_PX = 200;
 type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+function measureSectionInnerWidth(el: HTMLElement | null): number {
+  if (!el) return 0;
+  const section = el.closest('section');
+  if (!section) return 0;
+  const cs = window.getComputedStyle(section);
+  const padL = parseFloat(cs.paddingLeft) || 0;
+  const padR = parseFloat(cs.paddingRight) || 0;
+  return Math.max(0, section.clientWidth - padL - padR);
+}
 
 function extractAspectFromClassName(className?: string): string | undefined {
   if (!className) return undefined;
@@ -83,6 +92,7 @@ export function EditableImage({
   const current = get(contentKey, defaultSrc);
   const storedAspect = get(`${contentKey}.aspect`, '');
   const storedHeight = get(`${contentKey}.height`, '');
+  const storedWidthPx = get(`${contentKey}.widthPx`, '');
   const storedWidthPct = get(`${contentKey}.widthPct`, '');
   const storedPosition = get(`${contentKey}.position`, DEFAULT_POSITION);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -94,13 +104,20 @@ export function EditableImage({
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   const [livePosition, setLivePosition] = useState<string | null>(null);
   const [liveHeight, setLiveHeight] = useState<number | null>(null);
-  const [liveWidthPct, setLiveWidthPct] = useState<number | null>(null);
+  const [liveWidthPx, setLiveWidthPx] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState<ResizeHandle | null>(null);
+  const [parentWidth, setParentWidth] = useState(0);
+  const [sectionInnerWidth, setSectionInnerWidth] = useState(0);
 
   const isManual = storedAspect === MANUAL_KEY;
   const manualHeight = isManual ? parseInt(storedHeight, 10) || undefined : undefined;
-  const manualWidthPct = isManual ? parseFloat(storedWidthPct) || undefined : undefined;
+  const manualWidthPx = isManual
+    ? parseInt(storedWidthPx, 10) ||
+      (parentWidth && parseFloat(storedWidthPct)
+        ? Math.round((parseFloat(storedWidthPct) * parentWidth) / 100)
+        : undefined)
+    : undefined;
 
   useEffect(() => {
     setDims(null);
@@ -116,8 +133,33 @@ export function EditableImage({
   }, [storedHeight]);
 
   useEffect(() => {
-    setLiveWidthPct(null);
-  }, [storedWidthPct]);
+    setLiveWidthPx(null);
+  }, [storedWidthPx, storedWidthPct]);
+
+  // Observe the parent column and the enclosing <section> so we know the
+  // hard max the image is allowed to grow to (section inner width, which
+  // is wider than the max-w-4xl text column).
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const parent = wrapper.parentElement;
+    if (!parent) return;
+    const section = parent.closest('section') as HTMLElement | null;
+
+    const update = () => {
+      setParentWidth(parent.offsetWidth);
+      setSectionInnerWidth(measureSectionInnerWidth(parent) || parent.offsetWidth);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(parent);
+    if (section) ro.observe(section);
+    window.addEventListener('resize', update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   // Position drag (object-position)
   useEffect(() => {
@@ -163,23 +205,19 @@ export function EditableImage({
     };
   }, [dragging, storedPosition, contentKey, set]);
 
-  // Manual-mode resize: delta-based math so every handle grows the box in
-  // its own direction. Without this, top-left / bottom-left handles make
-  // width go negative and clamp to MIN instantly.
+  // Manual-mode resize: delta-based. Width can grow beyond the text column
+  // up to the section's inner width; we'll center it with negative margins.
   useEffect(() => {
     if (!resizing) return;
     const wrapper = wrapperRef.current;
-    const parent = wrapper?.parentElement;
-    if (!wrapper || !parent) return;
+    if (!wrapper) return;
     const startW = wrapper.offsetWidth;
     const startH = wrapper.offsetHeight;
-    const parentW = parent.offsetWidth;
-    const minWidthPx = (parentW * MIN_WIDTH_PCT) / 100;
-    const maxWidthPx = (parentW * MAX_WIDTH_PCT) / 100;
+    const maxW = Math.max(sectionInnerWidth, parentWidth, startW);
     const pointer = { x: 0, y: 0, set: false };
     const handle = resizing;
     let latestH = startH;
-    let latestWidthPct = (startW / parentW) * 100;
+    let latestWidthPx = startW;
 
     const onMove = (e: PointerEvent) => {
       if (!pointer.set) {
@@ -192,17 +230,24 @@ export function EditableImage({
       const dy = e.clientY - pointer.y;
       let dW = 0;
       let dH = 0;
-      if (handle === 'e' || handle === 'ne' || handle === 'se') dW = dx;
-      if (handle === 'w' || handle === 'nw' || handle === 'sw') dW = -dx;
-      if (handle === 's' || handle === 'sw' || handle === 'se') dH = dy;
-      if (handle === 'n' || handle === 'nw' || handle === 'ne') dH = -dy;
+      // Side handles affect width by the full delta; corners affect width by
+      // 2 * delta (symmetric growth) so dragging one corner feels like it's
+      // expanding / shrinking the whole box the same way on both sides.
+      if (handle === 'e') dW = dx;
+      if (handle === 'w') dW = -dx;
+      if (handle === 'ne' || handle === 'se') dW = 2 * dx;
+      if (handle === 'nw' || handle === 'sw') dW = -2 * dx;
+      if (handle === 's') dH = dy;
+      if (handle === 'n') dH = -dy;
+      if (handle === 'sw' || handle === 'se') dH = 2 * dy;
+      if (handle === 'nw' || handle === 'ne') dH = -2 * dy;
 
-      const newW = clamp(startW + dW, minWidthPx, maxWidthPx);
+      const newW = clamp(startW + dW, MIN_WIDTH_PX, maxW);
       const newH = clamp(startH + dH, MIN_HEIGHT, MAX_HEIGHT);
       latestH = Math.round(newH);
-      latestWidthPct = (newW / parentW) * 100;
+      latestWidthPx = Math.round(newW);
       setLiveHeight(latestH);
-      setLiveWidthPct(Math.round(latestWidthPct * 10) / 10);
+      setLiveWidthPx(latestWidthPx);
     };
 
     const touchesHeight = handle === 'n' || handle === 's' || handle.length === 2;
@@ -212,7 +257,12 @@ export function EditableImage({
       setResizing(null);
       try {
         if (touchesHeight) await set(`${contentKey}.height`, `${latestH}`);
-        if (touchesWidth) await set(`${contentKey}.widthPct`, `${latestWidthPct.toFixed(1)}`);
+        if (touchesWidth) {
+          await set(`${contentKey}.widthPx`, `${latestWidthPx}`);
+          // keep the old percentage slot in sync/empty so stale data can't
+          // resurrect and override the px value on reload.
+          await set(`${contentKey}.widthPct`, '');
+        }
       } catch (err) {
         console.error('[EditableImage] resize save failed', err);
       }
@@ -224,7 +274,7 @@ export function EditableImage({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [resizing, contentKey, set]);
+  }, [resizing, contentKey, set, sectionInnerWidth, parentWidth]);
 
   const handleImgLoad = () => {
     const img = imgRef.current;
@@ -270,6 +320,7 @@ export function EditableImage({
       await set(contentKey, '');
       await set(`${contentKey}.aspect`, '');
       await set(`${contentKey}.height`, '');
+      await set(`${contentKey}.widthPx`, '');
       await set(`${contentKey}.widthPct`, '');
       await set(`${contentKey}.position`, '');
     } catch (err) {
@@ -283,6 +334,7 @@ export function EditableImage({
       // leaving manual mode clears manual height / width
       if (value !== MANUAL_KEY) {
         await set(`${contentKey}.height`, '');
+        await set(`${contentKey}.widthPx`, '');
         await set(`${contentKey}.widthPct`, '');
       }
       setCustomInput('');
@@ -294,13 +346,13 @@ export function EditableImage({
 
   const pickManual = async () => {
     const wrapper = wrapperRef.current;
-    const parent = wrapper?.parentElement;
     const snapH = wrapper ? Math.round(clamp(wrapper.offsetHeight, MIN_HEIGHT, MAX_HEIGHT)) : 400;
-    const snapW = wrapper && parent ? (wrapper.offsetWidth / parent.offsetWidth) * 100 : 100;
+    const snapW = wrapper ? Math.round(wrapper.offsetWidth) : parentWidth || 800;
     try {
       await set(`${contentKey}.aspect`, MANUAL_KEY);
       await set(`${contentKey}.height`, `${snapH}`);
-      await set(`${contentKey}.widthPct`, `${clamp(snapW, MIN_WIDTH_PCT, MAX_WIDTH_PCT).toFixed(1)}`);
+      await set(`${contentKey}.widthPx`, `${snapW}`);
+      await set(`${contentKey}.widthPct`, '');
       setCustomInput('');
       setCustomError(null);
     } catch (err) {
@@ -318,6 +370,7 @@ export function EditableImage({
     try {
       await set(`${contentKey}.aspect`, normalized);
       await set(`${contentKey}.height`, '');
+      await set(`${contentKey}.widthPx`, '');
       await set(`${contentKey}.widthPct`, '');
     } catch (err) {
       alert('비율 변경 실패: ' + (err instanceof Error ? err.message : String(err)));
@@ -340,7 +393,7 @@ export function EditableImage({
   const effectivePosition = livePosition ?? storedPosition;
   const isRepositioned = storedPosition !== DEFAULT_POSITION && storedPosition !== '';
   const effectiveHeight = liveHeight ?? manualHeight;
-  const effectiveWidthPct = liveWidthPct ?? manualWidthPct;
+  const effectiveWidthPx = liveWidthPx ?? manualWidthPx;
 
   const wrapperStyle: CSSProperties = {
     ...style,
@@ -348,15 +401,21 @@ export function EditableImage({
     overflow: 'hidden',
   };
   if (isManual) {
+    const w = effectiveWidthPx ?? parentWidth ?? 800;
+    const overflow = parentWidth > 0 ? Math.max(0, (w - parentWidth) / 2) : 0;
     wrapperStyle.height = `${effectiveHeight ?? 400}px`;
-    wrapperStyle.width = `${effectiveWidthPct ?? 100}%`;
+    wrapperStyle.width = `${w}px`;
     wrapperStyle.aspectRatio = 'auto';
+    if (overflow > 0) {
+      wrapperStyle.marginLeft = `-${overflow}px`;
+      wrapperStyle.marginRight = `-${overflow}px`;
+    } else {
+      wrapperStyle.marginLeft = 0;
+      wrapperStyle.marginRight = 0;
+    }
   } else if (aspectOverride) {
     wrapperStyle.aspectRatio = aspectOverride;
   } else {
-    // Auto: parse the className's aspect-[...] utility and mirror it as
-    // inline CSS so the box always has a concrete size, even if the
-    // Tailwind JIT didn't ship that specific arbitrary class in this build.
     const classAspect = extractAspectFromClassName(className);
     wrapperStyle.aspectRatio = classAspect ?? '16 / 9';
   }
@@ -544,7 +603,7 @@ export function EditableImage({
                 marginRight: 14,
               }}
             >
-              {(effectiveWidthPct ?? 100).toFixed(0)}% × {effectiveHeight ?? 400}px
+              {effectiveWidthPx ?? parentWidth ?? 800}px × {effectiveHeight ?? 400}px
             </div>
           </>
         )}
