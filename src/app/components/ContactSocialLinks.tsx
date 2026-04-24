@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   Plus,
   X,
-  GripVertical,
   Instagram,
   Github,
   Linkedin,
@@ -13,6 +12,7 @@ import {
   Phone,
   type LucideIcon,
 } from 'lucide-react';
+import { DragHandleDots } from './admin/DragHandleDots';
 import { motion } from 'motion/react';
 import {
   DndContext,
@@ -244,12 +244,12 @@ function SocialLinkRow({
         <button
           type="button"
           {...listeners}
-          className="flex-shrink-0 text-[#BBBBBB] hover:text-[#0057FF] transition-colors"
+          className="flex-shrink-0 text-[#888888] hover:text-[#0057FF] transition-colors"
           style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           aria-label="드래그로 순서 변경"
           title="드래그로 순서 변경"
         >
-          <GripVertical size={16} />
+          <DragHandleDots size={18} />
         </button>
       )}
       <Icon size={24} className="text-[#0057FF] flex-shrink-0" />

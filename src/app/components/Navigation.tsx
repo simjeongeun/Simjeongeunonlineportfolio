@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Plus, GripVertical } from 'lucide-react';
+import { Menu, X, Plus } from 'lucide-react';
+import { DragHandleDots } from './admin/DragHandleDots';
 import {
   DndContext,
   closestCenter,
@@ -69,12 +70,11 @@ function NavItemButton({
     >
       {isAdmin && (
         <span
-          className="text-[#BBBBBB] group-hover/item:text-[#0057FF] transition-colors duration-200"
+          className="inline-flex items-center text-[#888888] group-hover/item:text-[#0057FF] transition-colors duration-200"
           style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-          aria-hidden
           title="드래그로 순서 변경"
         >
-          <GripVertical size={size === 'mobile' ? 16 : 14} />
+          <DragHandleDots size={size === 'mobile' ? 18 : 14} title="드래그로 순서 변경" />
         </span>
       )}
       <button

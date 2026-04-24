@@ -1,4 +1,5 @@
-import { GripVertical, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
+import { DragHandleDots } from './admin/DragHandleDots';
 import { motion } from 'motion/react';
 import {
   DndContext,
@@ -137,12 +138,12 @@ function ExperienceRow({
         <button
           type="button"
           {...listeners}
-          className="flex-shrink-0 mt-1 text-[#BBBBBB] hover:text-[#0057FF] transition-colors"
+          className="flex-shrink-0 mt-1 text-[#888888] hover:text-[#0057FF] transition-colors"
           style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           aria-label="드래그로 순서 변경"
           title="드래그로 순서 변경"
         >
-          <GripVertical size={16} />
+          <DragHandleDots size={18} />
         </button>
       )}
       <div className="flex-1 min-w-0">

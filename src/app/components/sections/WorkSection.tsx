@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
-import { ArrowRight, GripVertical, Plus, X } from 'lucide-react';
+import { ArrowRight, Plus, X } from 'lucide-react';
+import { DragHandleDots } from '../admin/DragHandleDots';
 import { useNavigate } from 'react-router';
 import {
   DndContext,
@@ -188,12 +189,12 @@ function ProjectRowContainer({
             type="button"
             {...listeners}
             onClick={(e) => e.stopPropagation()}
-            className="flex-shrink-0 text-[#BBBBBB] hover:text-[#0057FF] transition-colors"
+            className="flex-shrink-0 text-[#888888] hover:text-[#0057FF] transition-colors"
             style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
             aria-label="드래그로 순서 변경"
             title="드래그로 순서 변경"
           >
-            <GripVertical size={18} />
+            <DragHandleDots size={20} />
           </button>
         )}
 
