@@ -416,19 +416,17 @@ export function EditableImage({
     position: 'relative',
     overflow: 'hidden',
   };
+  // Manual mode uses the same width/centering in both admin and view
+  // renders, otherwise the saved widthPx gets capped by the parent
+  // className's max-w-* and the image snaps back on exit.
   if (isManual) {
     const w = effectiveWidthPx ?? parentWidth ?? 800;
-    const overflow = parentWidth > 0 ? Math.max(0, (w - parentWidth) / 2) : 0;
     wrapperStyle.height = `${effectiveHeight ?? 400}px`;
     wrapperStyle.width = `${w}px`;
+    wrapperStyle.maxWidth = 'none';
+    wrapperStyle.marginLeft = 'auto';
+    wrapperStyle.marginRight = 'auto';
     wrapperStyle.aspectRatio = 'auto';
-    if (overflow > 0) {
-      wrapperStyle.marginLeft = `-${overflow}px`;
-      wrapperStyle.marginRight = `-${overflow}px`;
-    } else {
-      wrapperStyle.marginLeft = 0;
-      wrapperStyle.marginRight = 0;
-    }
   } else if (aspectOverride) {
     wrapperStyle.aspectRatio = aspectOverride;
   } else {
@@ -449,7 +447,7 @@ export function EditableImage({
   if (!isAdmin) {
     if (!hasImage) return null;
     return (
-      <div className={className} style={wrapperStyle}>
+      <div ref={wrapperRef} className={className} style={wrapperStyle}>
         <img src={current} alt={alt} style={fillStyle} />
       </div>
     );
@@ -460,18 +458,6 @@ export function EditableImage({
     outline: '1px dashed rgba(0, 87, 255, 0.4)',
     outlineOffset: '2px',
   };
-  // In manual mode the image frame ignores the className's max-width cap
-  // (like max-w-4xl) so the user can stretch all the way to the outer
-  // container — i.e. the same width as the status bar below. Width is
-  // taken from the stored widthPx (or live drag value), centered with
-  // auto margins so it stays aligned with the rest of the column.
-  if (isManual) {
-    const w = effectiveWidthPx ?? parentWidth ?? 800;
-    adminWrapperStyle.width = `${w}px`;
-    adminWrapperStyle.maxWidth = 'none';
-    adminWrapperStyle.marginLeft = 'auto';
-    adminWrapperStyle.marginRight = 'auto';
-  }
 
   return (
     <div className="w-full">

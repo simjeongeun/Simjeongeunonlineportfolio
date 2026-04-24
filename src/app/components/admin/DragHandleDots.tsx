@@ -4,35 +4,28 @@ type DragHandleDotsProps = {
   title?: string;
 };
 
+// Two rounded vertical pills — the modern drag affordance used by
+// Notion, Linear, Raycast. Kept the old `DragHandleDots` name so
+// existing imports don't need to change.
 export function DragHandleDots({
   size = 14,
   className,
   title,
 }: DragHandleDotsProps) {
-  const w = Math.round(size * (6 / 10));
   const h = size;
-  const r = Math.max(1, size / 10);
-  const dots: [number, number][] = [
-    [1.5, 1.5],
-    [4.5, 1.5],
-    [1.5, 5],
-    [4.5, 5],
-    [1.5, 8.5],
-    [4.5, 8.5],
-  ];
+  const w = Math.max(6, Math.round(size * 0.5));
   return (
     <svg
       width={w}
       height={h}
-      viewBox="0 0 6 10"
+      viewBox="0 0 8 16"
       aria-hidden={title ? undefined : true}
       role={title ? 'img' : undefined}
       className={className}
     >
       {title && <title>{title}</title>}
-      {dots.map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={r} fill="currentColor" />
-      ))}
+      <rect x="1.2" y="2.5" width="1.8" height="11" rx="0.9" fill="currentColor" />
+      <rect x="5" y="2.5" width="1.8" height="11" rx="0.9" fill="currentColor" />
     </svg>
   );
 }
