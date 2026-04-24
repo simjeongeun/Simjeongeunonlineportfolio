@@ -26,6 +26,7 @@ type NavContextValue = {
   addItem: (label?: string) => Promise<NavItem>;
   removeItem: (id: string) => Promise<void>;
   updateItem: (id: string, patch: Partial<NavItem>) => Promise<void>;
+  reorderItems: (fromIdx: number, toIdx: number) => Promise<void>;
 };
 
 const NavContext = createContext<NavContextValue | undefined>(undefined);
@@ -109,6 +110,16 @@ export function NavProvider({ children }: { children: ReactNode }) {
         setSeeded(true);
         await writeRemote(next);
       },
+      reorderItems: async (fromIdx, toIdx) => {
+        const arr = current();
+        if (toIdx < 0 || toIdx >= arr.length) return;
+        const next = [...arr];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        setItems(next);
+        setSeeded(true);
+        await writeRemote(next);
+      },
     };
   }, [items, ready, seeded]);
 
@@ -128,6 +139,9 @@ export function useNav(): NavContextValue {
         throw new Error('NavProvider not mounted');
       },
       updateItem: async () => {
+        throw new Error('NavProvider not mounted');
+      },
+      reorderItems: async () => {
         throw new Error('NavProvider not mounted');
       },
     };

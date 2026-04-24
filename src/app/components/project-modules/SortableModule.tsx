@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, ChevronUp, ChevronDown, X, Check } from 'lucide-react';
+import { ChevronUp, ChevronDown, X, Check } from 'lucide-react';
+import { DragHandleDots } from '../admin/DragHandleDots';
 import {
   MODULE_LABELS,
   type ModuleType,
@@ -104,11 +105,11 @@ export function SortableModule({
           <button
             type="button"
             {...listeners}
-            className="p-1 text-[#999999] hover:text-[#0057FF] cursor-grab active:cursor-grabbing transition-colors"
+            className="p-1 text-[#888888] hover:text-[#0057FF] cursor-grab active:cursor-grabbing transition-colors"
             aria-label="드래그로 이동"
             title="드래그로 이동"
           >
-            <GripVertical size={14} />
+            <DragHandleDots size={16} />
           </button>
           <span className="w-px h-3 bg-[#EEEEEE] mx-1" />
           <button

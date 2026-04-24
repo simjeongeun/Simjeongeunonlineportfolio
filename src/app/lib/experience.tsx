@@ -29,6 +29,7 @@ type ExperienceContextValue = {
   addItem: () => Promise<ExperienceItem>;
   removeItem: (id: string) => Promise<void>;
   updateItem: (id: string, patch: Partial<ExperienceItem>) => Promise<void>;
+  reorderItems: (fromIdx: number, toIdx: number) => Promise<void>;
 };
 
 const ExperienceContext = createContext<ExperienceContextValue | undefined>(undefined);
@@ -108,6 +109,16 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
         setSeeded(true);
         await writeRemote(next);
       },
+      reorderItems: async (fromIdx, toIdx) => {
+        const arr = current();
+        if (toIdx < 0 || toIdx >= arr.length) return;
+        const next = [...arr];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        setItems(next);
+        setSeeded(true);
+        await writeRemote(next);
+      },
     };
   }, [items, ready, seeded]);
 
@@ -127,6 +138,9 @@ export function useExperience(): ExperienceContextValue {
         throw new Error('ExperienceProvider not mounted');
       },
       updateItem: async () => {
+        throw new Error('ExperienceProvider not mounted');
+      },
+      reorderItems: async () => {
         throw new Error('ExperienceProvider not mounted');
       },
     };

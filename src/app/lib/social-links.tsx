@@ -48,6 +48,7 @@ type SocialLinksContextValue = {
   addLink: (platform: SocialPlatform, url: string) => Promise<SocialLink>;
   removeLink: (id: string) => Promise<void>;
   updateLink: (id: string, patch: Partial<SocialLink>) => Promise<void>;
+  reorderLinks: (fromIdx: number, toIdx: number) => Promise<void>;
 };
 
 const SocialLinksContext = createContext<SocialLinksContextValue | undefined>(undefined);
@@ -123,6 +124,16 @@ export function SocialLinksProvider({ children }: { children: ReactNode }) {
         setSeeded(true);
         await writeRemote(next);
       },
+      reorderLinks: async (fromIdx, toIdx) => {
+        const arr = current();
+        if (toIdx < 0 || toIdx >= arr.length) return;
+        const next = [...arr];
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        setItems(next);
+        setSeeded(true);
+        await writeRemote(next);
+      },
     };
   }, [items, ready, seeded]);
 
@@ -142,6 +153,9 @@ export function useSocialLinks(): SocialLinksContextValue {
         throw new Error('SocialLinksProvider not mounted');
       },
       updateLink: async () => {
+        throw new Error('SocialLinksProvider not mounted');
+      },
+      reorderLinks: async () => {
         throw new Error('SocialLinksProvider not mounted');
       },
     };
