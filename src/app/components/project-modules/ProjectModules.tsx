@@ -45,6 +45,8 @@ const PALETTE: ModuleType[] = [
   'image-details-3',
   'text-image-split',
   'numbered-list-3',
+  'target-diagram',
+  'dual-image',
 ];
 
 export function ProjectModules({ projectId }: ProjectModulesProps) {

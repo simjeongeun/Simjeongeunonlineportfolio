@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Check, Upload, Trash2, Move, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Check, Upload, Trash2, Move, RotateCcw, Lock, Unlock } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useContent } from '../../lib/content';
 import { uploadToCloudinary } from '../../lib/cloudinary-upload';
@@ -11,6 +11,9 @@ type EditableImageProps = {
   className?: string;
   style?: CSSProperties;
   folder?: string;
+  /** Content rendered on top of the image (e.g. a title overlay). Absolutely
+   *  positioned children stay pinned to the image in both admin and view modes. */
+  overlay?: ReactNode;
 };
 
 const ASPECT_PRESETS: { label: string; value: string | undefined }[] = [
@@ -100,6 +103,7 @@ export function EditableImage({
   className,
   style,
   folder = 'portfolio/uploads',
+  overlay,
 }: EditableImageProps) {
   const { isAdmin } = useAuth();
   const { get, set } = useContent();
@@ -123,6 +127,10 @@ export function EditableImage({
   const [resizing, setResizing] = useState<ResizeHandle | null>(null);
   const [parentWidth, setParentWidth] = useState(0);
   const [sectionInnerWidth, setSectionInnerWidth] = useState(0);
+  // Keep the image's natural proportions while resizing so diagrams scale
+  // uniformly instead of stretching. On by default.
+  const [lockAspect, setLockAspect] = useState(true);
+  const [widthInput, setWidthInput] = useState('');
 
   const isManual = storedAspect === MANUAL_KEY;
   const manualHeight = isManual ? parseInt(storedHeight, 10) || undefined : undefined;
@@ -232,6 +240,10 @@ export function EditableImage({
     const maxW = Math.max(parentWidth, startW, MIN_WIDTH_PX);
     const pointer = { x: 0, y: 0, set: false };
     const handle = resizing;
+    // Natural proportion of the image — used to keep the box's ratio constant
+    // while "비율 고정" is on. Fall back to the current box ratio if we haven't
+    // measured the source dimensions yet.
+    const ratio = dims && dims.h > 0 ? dims.w / dims.h : startH > 0 ? startW / startH : 1;
     let latestH = startH;
     let latestWidthPx = startW;
 
@@ -258,16 +270,34 @@ export function EditableImage({
       if (handle === 'sw' || handle === 'se') dH = 2 * dy;
       if (handle === 'nw' || handle === 'ne') dH = -2 * dy;
 
-      const newW = clamp(startW + dW, MIN_WIDTH_PX, maxW);
-      const newH = clamp(startH + dH, MIN_HEIGHT, MAX_HEIGHT);
+      let newW = clamp(startW + dW, MIN_WIDTH_PX, maxW);
+      let newH = clamp(startH + dH, MIN_HEIGHT, MAX_HEIGHT);
+
+      // When locked, derive the second dimension from the first so the box
+      // keeps the image's proportions. Side handles drive by width (corners
+      // included); top/bottom handles drive by height.
+      if (lockAspect && ratio > 0) {
+        const widthDriven = handle === 'e' || handle === 'w' || handle.length === 2;
+        if (widthDriven) {
+          newH = newW / ratio;
+          if (newH < MIN_HEIGHT) { newH = MIN_HEIGHT; newW = newH * ratio; }
+          if (newH > MAX_HEIGHT) { newH = MAX_HEIGHT; newW = newH * ratio; }
+        } else {
+          newW = newH * ratio;
+          if (newW < MIN_WIDTH_PX) { newW = MIN_WIDTH_PX; newH = newW / ratio; }
+          if (newW > maxW) { newW = maxW; newH = newW / ratio; }
+        }
+      }
+
       latestH = Math.round(newH);
       latestWidthPx = Math.round(newW);
       setLiveHeight(latestH);
       setLiveWidthPx(latestWidthPx);
     };
 
-    const touchesHeight = handle === 'n' || handle === 's' || handle.length === 2;
-    const touchesWidth = handle === 'e' || handle === 'w' || handle.length === 2;
+    const lockBoth = lockAspect && ratio > 0;
+    const touchesHeight = lockBoth || handle === 'n' || handle === 's' || handle.length === 2;
+    const touchesWidth = lockBoth || handle === 'e' || handle === 'w' || handle.length === 2;
 
     const onUp = async () => {
       setResizing(null);
@@ -290,7 +320,7 @@ export function EditableImage({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [resizing, contentKey, set, sectionInnerWidth, parentWidth]);
+  }, [resizing, contentKey, set, sectionInnerWidth, parentWidth, lockAspect, dims]);
 
   const handleImgLoad = () => {
     const img = imgRef.current;
@@ -401,6 +431,31 @@ export function EditableImage({
     }
   };
 
+  // Set an exact pixel width (manual mode). Height follows the image's
+  // natural proportions when "비율 고정" is on, so typing the same width on
+  // two diagrams gives them a consistent size.
+  const applyWidth = async () => {
+    const w = parseInt(widthInput, 10);
+    if (!w || w < MIN_WIDTH_PX) {
+      setWidthInput('');
+      return;
+    }
+    const ratio = dims && dims.h > 0 ? dims.w / dims.h : null;
+    const maxW = Math.max(parentWidth || w, MIN_WIDTH_PX);
+    const finalW = Math.round(clamp(w, MIN_WIDTH_PX, maxW));
+    let finalH = lockAspect && ratio ? finalW / ratio : manualHeight ?? 400;
+    finalH = Math.round(clamp(finalH, MIN_HEIGHT, MAX_HEIGHT));
+    try {
+      await set(`${contentKey}.aspect`, MANUAL_KEY);
+      await set(`${contentKey}.widthPx`, `${finalW}`);
+      await set(`${contentKey}.height`, `${finalH}`);
+      await set(`${contentKey}.widthPct`, '');
+      setWidthInput('');
+    } catch (err) {
+      alert('크기 적용 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   const hasImage = current.length > 0;
   const aspectOverride =
     storedAspect.length > 0 && storedAspect !== MANUAL_KEY ? storedAspect : undefined;
@@ -429,17 +484,26 @@ export function EditableImage({
     wrapperStyle.aspectRatio = 'auto';
   } else if (aspectOverride) {
     wrapperStyle.aspectRatio = aspectOverride;
+  } else if (style?.aspectRatio != null) {
+    // Caller passed an explicit aspectRatio via style — keep it (already spread).
+  } else if (extractAspectFromClassName(className)) {
+    // Caller passed an aspect-* utility class — let Tailwind drive it (so
+    // responsive variants like md:aspect-[21/9] keep working). No inline value.
   } else {
-    const classAspect = extractAspectFromClassName(className);
-    wrapperStyle.aspectRatio = classAspect ?? '16 / 9';
+    wrapperStyle.aspectRatio = '16 / 9';
   }
+
+  // Respect an explicit object-contain in the className (diagrams / line art
+  // shouldn't be cropped). Everything else keeps the photo-friendly cover fit.
+  const objectFit: CSSProperties['objectFit'] =
+    className && /\bobject-contain\b/.test(className) ? 'contain' : 'cover';
 
   const fillStyle: CSSProperties = {
     position: 'absolute',
     inset: 0,
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit,
     objectPosition: effectivePosition,
     display: 'block',
   };
@@ -449,6 +513,7 @@ export function EditableImage({
     return (
       <div ref={wrapperRef} className={className} style={wrapperStyle}>
         <img src={current} alt={alt} style={fillStyle} />
+        {overlay}
       </div>
     );
   }
@@ -495,6 +560,7 @@ export function EditableImage({
             이미지 없음 — 아래 "업로드" 버튼을 누르세요
           </div>
         )}
+        {overlay}
         {hasImage && (
           <div
             className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full pointer-events-none"
@@ -709,6 +775,53 @@ export function EditableImage({
           <span className="text-[#D00]" style={{ fontSize: 11 }}>
             {customError}
           </span>
+        )}
+
+        {isManual && (
+          <>
+            <span className="w-px h-4 bg-[#DCE4EE]" />
+
+            <button
+              type="button"
+              onClick={() => setLockAspect((v) => !v)}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full border transition-colors ${
+                lockAspect
+                  ? 'bg-[#0057FF] text-white border-[#0057FF]'
+                  : 'bg-white text-[#1A1A1A] border-[#DDD] hover:border-[#0057FF] hover:text-[#0057FF]'
+              }`}
+              style={{ fontSize: 11, fontWeight: lockAspect ? 500 : 400 }}
+              title="켜면 가로·세로 비율을 유지하며 크기를 조절합니다"
+            >
+              {lockAspect ? <Lock size={11} /> : <Unlock size={11} />}
+              <span>비율 고정</span>
+            </button>
+
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                placeholder="가로"
+                value={widthInput}
+                onChange={(e) => setWidthInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyWidth();
+                }}
+                className="w-16 px-2 py-0.5 border border-[#DDD] rounded text-[#1A1A1A] outline-none focus:border-[#0057FF]"
+                style={{ fontSize: 11 }}
+                title="가로 크기(px)를 입력하고 적용하세요. 두 이미지에 같은 값을 넣으면 크기가 일정해집니다."
+              />
+              <span className="text-[#999]" style={{ fontSize: 11 }}>
+                px
+              </span>
+              <button
+                type="button"
+                onClick={applyWidth}
+                className="px-2 py-0.5 rounded border border-[#DDD] text-[#1A1A1A] hover:border-[#0057FF] hover:text-[#0057FF] transition-colors"
+                style={{ fontSize: 11 }}
+              >
+                적용
+              </button>
+            </div>
+          </>
         )}
 
         <span className="w-px h-4 bg-[#DCE4EE]" />

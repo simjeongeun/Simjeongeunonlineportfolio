@@ -15,7 +15,9 @@ export type ModuleType =
   | 'eyebrow-title'
   | 'numbered-list-3'
   | 'image-mosaic-3'
-  | 'image-details-3';
+  | 'image-details-3'
+  | 'target-diagram'
+  | 'dual-image';
 
 export type ProjectModule = {
   id: string;
@@ -36,6 +38,8 @@ export const MODULE_LABELS: Record<ModuleType, string> = {
   'numbered-list-3': '숫자 리스트 3개 (01/02/03)',
   'image-mosaic-3': '이미지 모자이크 (7+5 / 전체)',
   'image-details-3': '이미지 카드 3열 (라벨 + 큰 제목 + 항목 리스트)',
+  'target-diagram': '타겟 다이어그램 (이미지 + 01/02/03 리스트)',
+  'dual-image': '캡션 이미지 2개 (좌우 배치)',
 };
 
 export type UseProjectModulesResult = {
