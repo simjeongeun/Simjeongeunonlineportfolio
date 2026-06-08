@@ -117,29 +117,29 @@ export function ProjectDetailTemplate({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.1 }}
         >
-          <div className="w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden relative">
-            <EditableImage
-              contentKey={k('hero.image')}
-              defaultSrc={heroImage ?? ''}
-              alt={title}
-              className="w-full h-full object-cover"
-              folder={`portfolio/${projectId}`}
-            />
-            <div className="absolute bottom-6 left-4 pointer-events-none">
-              <EditableText
-                contentKey={k('title')}
-                defaultValue={title}
-                as="h1"
-                className="text-white text-[22px] sm:text-[28px] md:text-[36px] lg:text-[42px] text-left pointer-events-auto"
-                style={{
-                  fontFamily: 'Inter, Pretendard, sans-serif',
-                  fontWeight: 700,
-                  letterSpacing: '0.01em',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                }}
-              />
-            </div>
-          </div>
+          <EditableImage
+            contentKey={k('hero.image')}
+            defaultSrc={heroImage ?? ''}
+            alt={title}
+            className="w-full aspect-[16/9] md:aspect-[21/9] object-cover"
+            folder={`portfolio/${projectId}`}
+            overlay={
+              <div className="absolute bottom-6 left-4 z-[5] pointer-events-none">
+                <EditableText
+                  contentKey={k('title')}
+                  defaultValue={title}
+                  as="h1"
+                  className="text-white text-[22px] sm:text-[28px] md:text-[36px] lg:text-[42px] text-left pointer-events-auto"
+                  style={{
+                    fontFamily: 'Inter, Pretendard, sans-serif',
+                    fontWeight: 700,
+                    letterSpacing: '0.01em',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  }}
+                />
+              </div>
+            }
+          />
         </motion.div>
       )}
 

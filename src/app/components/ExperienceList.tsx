@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../lib/auth';
+import { useContent } from '../lib/content';
 import { useExperience, type ExperienceItem } from '../lib/experience';
 import { EditableText } from './admin/EditableText';
 
@@ -70,7 +71,7 @@ export function ExperienceList() {
   ));
 
   return (
-    <div className="space-y-4">
+    <div className="border-t border-[#E5E5E5]">
       {isAdmin ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
@@ -84,7 +85,7 @@ export function ExperienceList() {
         <motion.button
           type="button"
           onClick={handleAdd}
-          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[#DDDDDD] rounded text-[#999999] hover:text-[#0057FF] hover:border-[#0057FF] transition-colors duration-200"
+          className="mt-4 w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[#DDDDDD] rounded text-[#999999] hover:text-[#0057FF] hover:border-[#0057FF] transition-colors duration-200"
           style={{
             fontFamily: 'Inter, Pretendard, sans-serif',
             fontWeight: 400,
@@ -111,6 +112,7 @@ function ExperienceRow({
   isAdmin: boolean;
   onRemove: () => void;
 }) {
+  const { get } = useContent();
   const {
     attributes,
     listeners,
@@ -127,18 +129,21 @@ function ExperienceRow({
     zIndex: isDragging ? 30 : undefined,
   };
 
+  const detail = get(`experience.${item.id}.detail`, '');
+  const showDetail = isAdmin || detail.length > 0;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="group/item relative border-l-2 border-[#0057FF] pl-6 py-2 flex items-start gap-3"
+      className="group/item relative flex items-start gap-3 py-5 border-b border-[#E5E5E5]"
       {...attributes}
     >
       {isAdmin && (
         <button
           type="button"
           {...listeners}
-          className="flex-shrink-0 mt-1 text-[#888888] hover:text-[#0057FF] transition-colors"
+          className="flex-shrink-0 mt-1 text-[#BBBBBB] hover:text-[#0057FF] transition-colors"
           style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           aria-label="드래그로 순서 변경"
           title="드래그로 순서 변경"
@@ -146,30 +151,57 @@ function ExperienceRow({
           <DragHandleDots size={18} />
         </button>
       )}
-      <div className="flex-1 min-w-0">
+
+      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-1 sm:gap-8">
         <EditableText
           contentKey={`experience.${item.id}.year`}
           defaultValue={item.year}
           as="p"
-          className="text-[#666666] block"
+          className="text-[#999999] block sm:pt-0.5"
           style={{
             fontFamily: 'Inter, Pretendard, sans-serif',
             fontWeight: 500,
-            fontSize: '14px',
+            fontSize: '13px',
+            letterSpacing: '0.04em',
+            fontVariantNumeric: 'tabular-nums',
           }}
         />
-        <EditableText
-          contentKey={`experience.${item.id}.title`}
-          defaultValue={item.title}
-          as="p"
-          className="text-[#1A1A1A] block"
-          style={{
-            fontFamily: 'Inter, Pretendard, sans-serif',
-            fontWeight: 500,
-            fontSize: '16px',
-          }}
-        />
+
+        <div className="min-w-0">
+          <EditableText
+            contentKey={`experience.${item.id}.title`}
+            defaultValue={item.title}
+            as="p"
+            className="text-[#1A1A1A] block"
+            style={{
+              fontFamily: 'Inter, Pretendard, sans-serif',
+              fontWeight: 600,
+              fontSize: '16px',
+              letterSpacing: '0.01em',
+              lineHeight: 1.5,
+            }}
+          />
+          {showDetail && (
+            <EditableText
+              contentKey={`experience.${item.id}.detail`}
+              defaultValue=""
+              as="div"
+              multiline
+              className="text-[#666666] block mt-1"
+              style={{
+                fontFamily: 'Inter, Pretendard, sans-serif',
+                fontWeight: 300,
+                fontSize: '14px',
+                lineHeight: 1.6,
+                letterSpacing: '0.01em',
+                whiteSpace: 'pre-line',
+                minHeight: isAdmin && detail.length === 0 ? '1.4em' : undefined,
+              }}
+            />
+          )}
+        </div>
       </div>
+
       {isAdmin && (
         <button
           type="button"

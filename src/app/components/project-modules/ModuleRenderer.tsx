@@ -488,6 +488,114 @@ export function ModuleRenderer({ projectId, module }: ModuleRendererProps) {
         </motion.div>
       );
 
+    case 'target-diagram':
+      return (
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-0"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+        >
+          <div className="flex items-center justify-center mb-8 md:mb-0 md:border-r md:border-[#E0E0E0] md:pr-8">
+            <EditableImage
+              contentKey={k('image')}
+              defaultSrc=""
+              alt=""
+              className="w-full max-w-[240px] object-contain"
+              folder={folder}
+            />
+          </div>
+          <div className="flex flex-col divide-y divide-[#E0E0E0] md:pl-8">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="grid grid-cols-[110px_1fr] gap-4 py-6 first:pt-0 last:pb-0"
+              >
+                <div className="flex flex-col justify-center">
+                  <EditableText
+                    contentKey={k(`number-${n}`)}
+                    defaultValue={`0${n}`}
+                    as="span"
+                    className="text-[#5bc0cc] mb-2 block"
+                    style={{
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '11px',
+                      letterSpacing: '0.1em',
+                    }}
+                  />
+                  <EditableText
+                    contentKey={k(`label-${n}`)}
+                    defaultValue={`항목 ${n}`}
+                    as="h3"
+                    className="text-[#1A1A1A] block"
+                    style={{
+                      fontFamily: 'Inter, Pretendard, sans-serif',
+                      fontWeight: 600,
+                      fontSize: '15px',
+                      letterSpacing: '0.01em',
+                    }}
+                  />
+                </div>
+                <div className="flex items-center">
+                  <EditableText
+                    contentKey={k(`desc-${n}`)}
+                    defaultValue="설명을 입력하세요."
+                    as="p"
+                    multiline
+                    className="text-[#666666]"
+                    style={{
+                      fontFamily: 'Inter, Pretendard, sans-serif',
+                      fontWeight: 300,
+                      fontSize: '13px',
+                      lineHeight: '1.8',
+                      whiteSpace: 'pre-line',
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      );
+
+    case 'dual-image':
+      return (
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.7 }}
+        >
+          {[1, 2].map((n) => (
+            <div key={n}>
+              <EditableImage
+                contentKey={k(`image-${n}`)}
+                defaultSrc=""
+                alt=""
+                className="w-full object-contain"
+                folder={folder}
+              />
+              <EditableText
+                contentKey={k(`caption-${n}`)}
+                defaultValue=""
+                as="p"
+                className="text-[#999999] mt-4 text-center block"
+                style={{
+                  fontFamily: 'Inter, Pretendard, sans-serif',
+                  fontWeight: 400,
+                  fontSize: '12px',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              />
+            </div>
+          ))}
+        </motion.div>
+      );
+
     default:
       return null;
   }
